@@ -55,7 +55,7 @@ jobs:
       - name: Create git tag
         id: tag
         run: |
-          VERSION=$(dart run scripts/version_manager.dart show | grep "Version:" | cut -d' ' -f4)
+          VERSION=$(dart run scripts/version_manager.dart show | grep "FlutterForge CLI Version:" | sed 's/.*FlutterForge CLI Version: //')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           git tag v$VERSION
           git push origin v$VERSION
