@@ -90,6 +90,12 @@ class ProjectRepositoryImpl implements ProjectRepository {
     // Create internationalization setup
     await _fileSystemDataSource.createInternationalization(config.projectName);
 
+    // Generate localization files
+    await _flutterCommandDataSource.generateLocalizationFiles(config.projectName);
+
+    // Clean build cache to prevent depfile issues
+    await _flutterCommandDataSource.cleanBuildCache(config.projectName);
+
     // Create barrel files if Clean Architecture is enabled
     if (config.includeCleanArchitecture) {
       await _fileSystemDataSource.createBarrelFiles(
