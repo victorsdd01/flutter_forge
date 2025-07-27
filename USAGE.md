@@ -8,14 +8,14 @@ FlutterForge CLI works on **Windows**, **macOS**, and **Linux**!
 ### Option 1: Install from Git (Recommended)
 ```bash
 # All platforms
-dart pub global activate --source git https://github.com/yourusername/flutterforge.git
+dart pub global activate --source git https://github.com/victorsdd01/flutter_forge.git
 ```
 
 ### Option 2: Install from Local Source
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/flutterforge.git
-cd flutterforge
+git clone https://github.com/victorsdd01/flutter_forge.git
+cd flutter_forge
 
 # Install globally
 dart pub global activate --source path .
@@ -26,21 +26,21 @@ dart pub global activate --source path .
 #### **Windows**
 ```cmd
 # Using batch script
-git clone https://github.com/yourusername/flutterforge.git
-cd flutterforge
+git clone https://github.com/victorsdd01/flutter_forge.git
+cd flutter_forge
 install.bat
 
 # Using PowerShell script
-git clone https://github.com/yourusername/flutterforge.git
-cd flutterforge
+git clone https://github.com/victorsdd01/flutter_forge.git
+cd flutter_forge
 powershell -ExecutionPolicy Bypass -File install.ps1
 ```
 
 #### **macOS/Linux**
 ```bash
 # Using shell script
-git clone https://github.com/yourusername/flutterforge.git
-cd flutterforge
+git clone https://github.com/victorsdd01/flutter_forge.git
+cd flutter_forge
 ./install.sh
 ```
 
@@ -112,7 +112,7 @@ flutter run
 
 ```bash
 # 1. Install the CLI
-dart pub global activate --source git https://github.com/yourusername/flutterforge.git
+dart pub global activate --source git https://github.com/victorsdd01/flutter_forge.git
 
 # 2. Create a project
 flutterforge
