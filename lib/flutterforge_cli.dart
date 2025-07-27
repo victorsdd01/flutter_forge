@@ -10,7 +10,7 @@ import 'presentation/controllers/cli_controller.dart';
 class FlutterForgeCLI {
   static const String _appName = 'flutterforce';
   static const String _description = 'A Flutter CLI tool for creating projects with interactive prompts.';
-  static const String _version = '1.0.2';
+  static const String _version = '1.0.3';
 
   late ArgParser _argParser;
   late ArgResults _argResults;
