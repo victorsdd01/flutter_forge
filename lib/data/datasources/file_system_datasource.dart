@@ -146,16 +146,7 @@ class FileSystemDataSourceImpl implements FileSystemDataSource {
         pubspecContent = pubspecContent.replaceFirst(
           'uses-material-design: true',
           '''uses-material-design: true
-  generate: true
-  assets:
-    - assets/jsons/
-    - assets/images/
-    - assets/images/icons/
-    - assets/images/avatares/children/
-    - assets/images/avatares/man/
-    - assets/images/avatares/others/
-    - assets/images/avatares/woman/
-    - assets/svg/'''
+  generate: true'''
         );
       }
     }
@@ -1590,6 +1581,12 @@ abstract class SampleEntity with _\$SampleEntity {
   }) = _SampleEntity;
 
   factory SampleEntity.fromJson(Map<String, dynamic> json) => _\$SampleEntityFromJson(json);
+
+  factory SampleEntity.fromModel(SampleModel model) => SampleEntity(
+    id: model.id,
+    name: model.name,
+    description: model.description,
+  );
 }
 ''';
     } else {
@@ -1607,6 +1604,12 @@ class SampleEntity extends BaseEntity {
     required this.name,
     required this.description,
   });
+
+  factory SampleEntity.fromModel(SampleModel model) => SampleEntity(
+    id: model.id,
+    name: model.name,
+    description: model.description,
+  );
 
   @override
   List<Object?> get props => [id, name, description];
@@ -1987,24 +1990,24 @@ import '../../core/errors/failures.dart';
 
 /// Sample data source interface
 abstract class SampleDataSource {
-  Future<Either<Failure, List<SampleEntity>>> getSamples();
-  Future<Either<Failure, SampleEntity>> getSampleById(String id);
-  Future<Either<Failure, SampleEntity>> createSample(SampleEntity sample);
-  Future<Either<Failure, SampleEntity>> updateSample(SampleEntity sample);
+  Future<Either<Failure, List<SampleModel>>> getSamples();
+  Future<Either<Failure, SampleModel>> getSampleById(String id);
+  Future<Either<Failure, SampleModel>> createSample(SampleModel sample);
+  Future<Either<Failure, SampleModel>> updateSample(SampleModel sample);
   Future<Either<Failure, bool>> deleteSample(String id);
 }
 
 /// Remote data source implementation
 class SampleRemoteDataSource implements SampleDataSource {
   @override
-  Future<Either<Failure, List<SampleEntity>>> getSamples() async {
+  Future<Either<Failure, List<SampleModel>>> getSamples() async {
     try {
       // Simulate API call
       await Future.delayed(const Duration(seconds: 1));
       
       final samples = [
-        const SampleEntity(id: '1', name: 'Sample 1', description: 'Description 1'),
-        const SampleEntity(id: '2', name: 'Sample 2', description: 'Description 2'),
+        const SampleModel(id: '1', name: 'Sample 1', description: 'Description 1'),
+        const SampleModel(id: '2', name: 'Sample 2', description: 'Description 2'),
       ];
       
       return Right(samples);
@@ -2014,12 +2017,12 @@ class SampleRemoteDataSource implements SampleDataSource {
   }
 
   @override
-  Future<Either<Failure, SampleEntity>> getSampleById(String id) async {
+  Future<Either<Failure, SampleModel>> getSampleById(String id) async {
     try {
       // Simulate API call
       await Future.delayed(const Duration(seconds: 1));
       
-      final sample = SampleEntity(id: id, name: 'Sample \$id', description: 'Description \$id');
+      final sample = SampleModel(id: id, name: 'Sample \$id', description: 'Description \$id');
       return Right(sample);
     } catch (e) {
       return Left(ServerFailure('Failed to fetch sample: \$e'));
@@ -2027,7 +2030,7 @@ class SampleRemoteDataSource implements SampleDataSource {
   }
 
   @override
-  Future<Either<Failure, SampleEntity>> createSample(SampleEntity sample) async {
+  Future<Either<Failure, SampleModel>> createSample(SampleModel sample) async {
     try {
       // Simulate API call
       await Future.delayed(const Duration(seconds: 1));
@@ -2038,7 +2041,7 @@ class SampleRemoteDataSource implements SampleDataSource {
   }
 
   @override
-  Future<Either<Failure, SampleEntity>> updateSample(SampleEntity sample) async {
+  Future<Either<Failure, SampleModel>> updateSample(SampleModel sample) async {
     try {
       // Simulate API call
       await Future.delayed(const Duration(seconds: 1));
@@ -2063,14 +2066,14 @@ class SampleRemoteDataSource implements SampleDataSource {
 /// Local data source implementation
 class SampleLocalDataSource implements SampleDataSource {
   @override
-  Future<Either<Failure, List<SampleEntity>>> getSamples() async {
+  Future<Either<Failure, List<SampleModel>>> getSamples() async {
     try {
       // Simulate local storage
       await Future.delayed(const Duration(milliseconds: 100));
       
       final samples = [
-        const SampleEntity(id: '1', name: 'Local Sample 1', description: 'Local Description 1'),
-        const SampleEntity(id: '2', name: 'Local Sample 2', description: 'Local Description 2'),
+        const SampleModel(id: '1', name: 'Local Sample 1', description: 'Local Description 1'),
+        const SampleModel(id: '2', name: 'Local Sample 2', description: 'Local Description 2'),
       ];
       
       return Right(samples);
@@ -2080,12 +2083,12 @@ class SampleLocalDataSource implements SampleDataSource {
   }
 
   @override
-  Future<Either<Failure, SampleEntity>> getSampleById(String id) async {
+  Future<Either<Failure, SampleModel>> getSampleById(String id) async {
     try {
       // Simulate local storage
       await Future.delayed(const Duration(milliseconds: 100));
       
-      final sample = SampleEntity(id: id, name: 'Local Sample \$id', description: 'Local Description \$id');
+      final sample = SampleModel(id: id, name: 'Local Sample \$id', description: 'Local Description \$id');
       return Right(sample);
     } catch (e) {
       return Left(CacheFailure('Failed to fetch sample from cache: \$e'));
@@ -2093,7 +2096,7 @@ class SampleLocalDataSource implements SampleDataSource {
   }
 
   @override
-  Future<Either<Failure, SampleEntity>> createSample(SampleEntity sample) async {
+  Future<Either<Failure, SampleModel>> createSample(SampleModel sample) async {
     try {
       // Simulate local storage
       await Future.delayed(const Duration(milliseconds: 100));
@@ -2104,7 +2107,7 @@ class SampleLocalDataSource implements SampleDataSource {
   }
 
   @override
-  Future<Either<Failure, SampleEntity>> updateSample(SampleEntity sample) async {
+  Future<Either<Failure, SampleModel>> updateSample(SampleModel sample) async {
     try {
       // Simulate local storage
       await Future.delayed(const Duration(milliseconds: 100));
@@ -2159,15 +2162,15 @@ class SampleRepositoryImpl implements SampleRepository {
           final localResult = await _localDataSource.getSamples();
           return localResult.fold(
             (localFailure) => Left(ServerFailure('Both remote and local failed')),
-            (localSamples) => Right(localSamples),
+            (localSamples) => Right(localSamples.map((model) => SampleEntity.fromModel(model)).toList()),
           );
         },
-        (samples) async {
+        (models) async {
           // If remote succeeds, cache the data
-          for (final sample in samples) {
-            await _localDataSource.createSample(sample);
+          for (final model in models) {
+            await _localDataSource.createSample(model);
           }
-          return Right(samples);
+          return Right(models.map((model) => SampleEntity.fromModel(model)).toList());
         },
       );
     } catch (e) {
@@ -2187,13 +2190,13 @@ class SampleRepositoryImpl implements SampleRepository {
           final localResult = await _localDataSource.getSampleById(id);
           return localResult.fold(
             (localFailure) => Left(ServerFailure('Sample not found')),
-            (localSample) => Right(localSample),
+            (localModel) => Right(SampleEntity.fromModel(localModel)),
           );
         },
-        (sample) async {
+        (model) async {
           // If remote succeeds, cache the data
-          await _localDataSource.createSample(sample);
-          return Right(sample);
+          await _localDataSource.createSample(model);
+          return Right(SampleEntity.fromModel(model));
         },
       );
     } catch (e) {
@@ -2204,15 +2207,18 @@ class SampleRepositoryImpl implements SampleRepository {
   @override
   Future<Either<Failure, SampleEntity>> createSample(SampleEntity sample) async {
     try {
+      // Convert entity to model for datasource
+      final model = SampleModel.fromEntity(sample);
+      
       // Create in remote first
-      final remoteResult = await _remoteDataSource.createSample(sample);
+      final remoteResult = await _remoteDataSource.createSample(model);
       
       return remoteResult.fold(
         (failure) => Left(failure),
-        (createdSample) async {
+        (createdModel) async {
           // If remote succeeds, cache locally
-          await _localDataSource.createSample(createdSample);
-          return Right(createdSample);
+          await _localDataSource.createSample(createdModel);
+          return Right(SampleEntity.fromModel(createdModel));
         },
       );
     } catch (e) {
@@ -2223,15 +2229,18 @@ class SampleRepositoryImpl implements SampleRepository {
   @override
   Future<Either<Failure, SampleEntity>> updateSample(SampleEntity sample) async {
     try {
+      // Convert entity to model for datasource
+      final model = SampleModel.fromEntity(sample);
+      
       // Update in remote first
-      final remoteResult = await _remoteDataSource.updateSample(sample);
+      final remoteResult = await _remoteDataSource.updateSample(model);
       
       return remoteResult.fold(
         (failure) => Left(failure),
-        (updatedSample) async {
+        (updatedModel) async {
           // If remote succeeds, update locally
-          await _localDataSource.updateSample(updatedSample);
-          return Right(updatedSample);
+          await _localDataSource.updateSample(updatedModel);
+          return Right(SampleEntity.fromModel(updatedModel));
         },
       );
     } catch (e) {
@@ -2285,6 +2294,7 @@ class SampleModel with _\$SampleModel {
     name: entity.name,
     description: entity.description,
   );
+}
 }
 ''';
     } else {
