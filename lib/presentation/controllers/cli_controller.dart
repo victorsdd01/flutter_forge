@@ -63,11 +63,11 @@ class CliController {
   void _printWelcomeMessage() {
     print('');
     print('${_brightCyan}${_bold}╔══════════════════════════════════════════════════════════════╗${_reset}');
-    print('${_brightCyan}${_bold}║${_reset}${_brightMagenta}${_bold}                    🚀 FLUTTER FORCE CLI 🚀                    ${_reset}${_brightCyan}${_bold}║${_reset}');
+    print('${_brightCyan}${_bold}║${_reset}${_brightMagenta}${_bold}                    🚀 FLUTTERFORGE CLI 🚀                    ${_reset}${_brightCyan}${_bold}║${_reset}');
     print('${_brightCyan}${_bold}║${_reset}${_dim}           The Ultimate Flutter Project Generator           ${_reset}${_brightCyan}${_bold}║${_reset}');
     print('${_brightCyan}${_bold}╚══════════════════════════════════════════════════════════════╝${_reset}');
     print('');
-    print('${_brightYellow}${_bold}✨ Welcome to Flutter Force! Let\'s create something amazing! ✨${_reset}');
+    print('${_brightYellow}${_bold}✨ Welcome to FlutterForge! Let\'s create something amazing! ✨${_reset}');
     print('');
   }
 
@@ -301,7 +301,7 @@ class CliController {
       }
       
       print('');
-      print('${_brightMagenta}${_bold}✨ Happy coding with Flutter Force! ✨${_reset}');
+      print('${_brightMagenta}${_bold}✨ Happy coding with FlutterForge! ✨${_reset}');
       print('');
       
     } catch (e) {

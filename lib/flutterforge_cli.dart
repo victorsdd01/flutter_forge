@@ -6,7 +6,7 @@ import 'core/di/dependency_injection.dart';
 import 'core/utils/version_checker.dart';
 import 'presentation/controllers/cli_controller.dart';
 
-/// Main CLI class for Flutter Force
+/// Main CLI class for FlutterForge
 class FlutterForgeCLI {
   static const String _appName = 'flutterforce';
   static const String _description = 'A Flutter CLI tool for creating projects with interactive prompts.';
@@ -208,7 +208,7 @@ class FlutterForgeCLI {
     
     print('');
     print('${brightCyan}${bold}╔══════════════════════════════════════════════════════════════╗${reset}');
-    print('${brightCyan}${bold}║${reset}${bold}                    🔄 FLUTTER FORCE UPDATE 🔄                    ${reset}${brightCyan}${bold}║${reset}');
+                  print('${brightCyan}${bold}║${reset}${bold}                    🔄 FLUTTERFORGE UPDATE 🔄                    ${reset}${brightCyan}${bold}║${reset}');
     print('${brightCyan}${bold}╚══════════════════════════════════════════════════════════════╝${reset}');
     print('');
     
@@ -287,7 +287,7 @@ class FlutterForgeCLI {
     
     print('');
     print('${brightCyan}${bold}╔══════════════════════════════════════════════════════════════╗${reset}');
-    print('${brightCyan}${bold}║${reset}${brightMagenta}${bold}                    🚀 FLUTTER FORCE CLI 🚀                    ${reset}${brightCyan}${bold}║${reset}');
+                  print('${brightCyan}${bold}║${reset}${brightMagenta}${bold}                    🚀 FLUTTERFORGE CLI 🚀                    ${reset}${brightCyan}${bold}║${reset}');
     print('${brightCyan}${bold}║${reset}${dim}           The Ultimate Flutter Project Generator           ${reset}${brightCyan}${bold}║${reset}');
     print('${brightCyan}${bold}╚══════════════════════════════════════════════════════════════╝${reset}');
     print('');
@@ -297,7 +297,7 @@ class FlutterForgeCLI {
     print('${brightCyan}${bold}🔗 Repository:${reset} ${dim}https://github.com/victorsdd01/flutter_forge${reset}');
     print('${brightCyan}${bold}🔄 To update:${reset} ${dim}flutterforge -u${reset} ${dim}or${reset} ${dim}flutterforge --update${reset}');
     print('');
-    print('${brightMagenta}${bold}✨ Happy coding with Flutter Force! ✨${reset}');
+                  print('${brightMagenta}${bold}✨ Happy coding with FlutterForge! ✨${reset}');
     print('');
   }
 
@@ -311,7 +311,7 @@ class FlutterForgeCLI {
     
     print('');
     print('${brightCyan}${bold}╔══════════════════════════════════════════════════════════════╗${reset}');
-    print('${brightCyan}${bold}║${reset}${bold}                    🚀 FLUTTER FORCE CLI 🚀                    ${reset}${brightCyan}${bold}║${reset}');
+                  print('${brightCyan}${bold}║${reset}${bold}                    🚀 FLUTTERFORGE CLI 🚀                    ${reset}${brightCyan}${bold}║${reset}');
     print('${brightCyan}${bold}╚══════════════════════════════════════════════════════════════╝${reset}');
     print('');
     print('${brightGreen}${bold}📝 Description:${reset} ${dim}$_description${reset}');
