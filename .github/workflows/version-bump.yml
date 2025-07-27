@@ -6,6 +6,11 @@ on:
     branches:
       - main
 
+# Add explicit permissions for the workflow
+permissions:
+  contents: write
+  pull-requests: read
+
 jobs:
   version-bump:
     if: github.event.pull_request.merged == true
