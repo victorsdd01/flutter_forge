@@ -92,4 +92,14 @@ jobs:
           echo "✅ Version bump workflow completed successfully"
           echo "Version: ${{ steps.tag.outputs.version }}"
           echo "Tag: v${{ steps.tag.outputs.version }}"
-          echo "Release: FlutterForge CLI v${{ steps.tag.outputs.version }}" 
+          echo "Release: FlutterForge CLI v${{ steps.tag.outputs.version }}"
+      
+      - name: Update PR Status
+        run: |
+          gh api repos/${{ github.repository }}/statuses/${{ github.sha }} \
+            -f state=success \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            -f description="Version bump completed successfully" \
+            -f context="version-bump"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
