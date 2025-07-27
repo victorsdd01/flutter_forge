@@ -254,7 +254,7 @@ flutter run
 ### **Check Current Version:**
 ```bash
 # Using direct command (recommended)
-dart run bin/flutterforge.dart --version
+flutterforge --version
 
 # Or check the installed version
 dart pub global list | grep flutterforge
@@ -262,7 +262,12 @@ dart pub global list | grep flutterforge
 
 ### **Update to Latest Version:**
 ```bash
-# Update to latest version from Git
+# Update to latest version (recommended)
+flutterforge -u
+# or
+flutterforge --update
+
+# Manual update from Git
 dart pub global activate --source git https://github.com/victorsdd01/flutter_forge.git
 
 # Or if you want a specific version
@@ -275,6 +280,9 @@ dart pub global activate --source git https://github.com/victorsdd01/flutter_for
 cd flutter_forge
 git pull origin main
 dart pub global activate --source path .
+
+# Or use the CLI update command
+flutterforge -u
 ```
 
 ## 🗑️ Uninstalling FlutterForge CLI

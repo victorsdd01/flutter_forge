@@ -1,7 +1,6 @@
 #!/usr/bin/env dart
 
 import 'dart:io';
-import 'dart:convert';
 
 /// Version Manager for FlutterForge CLI
 /// Automatically increments version numbers for releases

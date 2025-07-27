@@ -185,7 +185,7 @@ class FlutterForgeCLI {
         print('${brightYellow}${bold}🔄 Update Available!${reset}');
         print('${dim}   Current: $_version${reset}');
         print('${dim}   Latest:  $latestVersion${reset}');
-        print('${dim}   Run: flutterforge --update${reset}');
+        print('${dim}   Run: flutterforge -u${reset} ${dim}or${reset} ${dim}flutterforge --update${reset}');
         print('');
       }
     } catch (e) {
@@ -265,7 +265,7 @@ class FlutterForgeCLI {
         print('${red}${result.stderr}${reset}');
         print('');
         print('${brightYellow}${bold}💡 Manual update:${reset}');
-        print('${dim}   dart pub global activate --source git https://github.com/victorsdd01/flutter_forge.git${reset}');
+        print('${dim}   flutterforge -u${reset} ${dim}or${reset} ${dim}flutterforge --update${reset}');
         print('');
       }
     } catch (e) {
@@ -297,7 +297,7 @@ class FlutterForgeCLI {
     print('${brightGreen}${bold}📝 Description:${reset} ${dim}$_description${reset}');
     print('');
     print('${brightCyan}${bold}🔗 Repository:${reset} ${dim}https://github.com/victorsdd01/flutter_forge${reset}');
-    print('${brightCyan}${bold}🔄 To update:${reset} ${dim}dart pub global activate --source git https://github.com/victorsdd01/flutter_forge.git${reset}');
+    print('${brightCyan}${bold}🔄 To update:${reset} ${dim}flutterforge -u${reset} ${dim}or${reset} ${dim}flutterforge --update${reset}');
     print('');
     print('${brightMagenta}${bold}✨ Happy coding with Flutter Force! ✨${reset}');
     print('');
@@ -322,6 +322,7 @@ class FlutterForgeCLI {
     print('${dim}   $_appName${reset} ${brightCyan}${bold}# Start interactive project creation${reset}');
     print('${dim}   $_appName --help${reset} ${brightCyan}${bold}# Show this help message${reset}');
     print('${dim}   $_appName --version${reset} ${brightCyan}${bold}# Show version information${reset}');
+    print('${dim}   $_appName -u${reset} ${brightCyan}${bold}# Update to latest version${reset}');
     print('${dim}   $_appName --update${reset} ${brightCyan}${bold}# Update to latest version${reset}');
     print('');
     print('${brightGreen}${bold}✨ Features:${reset}');

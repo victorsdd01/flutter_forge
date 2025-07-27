@@ -11,18 +11,13 @@ class CliController {
   static const String _reset = '\x1B[0m';
   static const String _bold = '\x1B[1m';
   static const String _dim = '\x1B[2m';
-  static const String _italic = '\x1B[3m';
-  static const String _underline = '\x1B[4m';
   
   // Colors
-  static const String _black = '\x1B[30m';
   static const String _red = '\x1B[31m';
   static const String _green = '\x1B[32m';
   static const String _yellow = '\x1B[33m';
-  static const String _blue = '\x1B[34m';
   static const String _magenta = '\x1B[35m';
   static const String _cyan = '\x1B[36m';
-  static const String _white = '\x1B[37m';
   
   // Bright colors
   static const String _brightRed = '\x1B[91m';
@@ -37,7 +32,7 @@ class CliController {
     
     final projectName = _getProjectName();
     final organization = _getOrganization();
-    final platforms = _getPlatforms();
+    _getPlatforms();
     final stateManagement = _getStateManagement();
     final includeGoRouter = _getGoRouterChoice();
     final includeCleanArchitecture = _getCleanArchitectureChoice();
