@@ -1,3 +1,5 @@
+// ignore_for_file: unnecessary_brace_in_string_interps
+
 import 'dart:io';
 import '../../domain/entities/project_config.dart';
 import '../../domain/repositories/project_repository.dart';

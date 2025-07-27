@@ -101,7 +101,6 @@ class FlutterForgeCLI {
     
     for (int i = 0; i < steps.length; i++) {
       final step = steps[i];
-      final progress = ((i + 1) / steps.length * 100).round();
       
       // Show step header
       print('${brightCyan}${bold}Step ${i + 1}/${steps.length}:${reset} ${brightYellow}${step['icon']} ${step['text']}${reset}');
@@ -127,7 +126,6 @@ class FlutterForgeCLI {
   Future<void> _showCompletionCelebration() async {
     const String reset = '\x1B[0m';
     const String bold = '\x1B[1m';
-    const String brightGreen = '\x1B[92m';
     const String brightYellow = '\x1B[93m';
     const String brightCyan = '\x1B[96m';
     const String brightMagenta = '\x1B[95m';
