@@ -62,14 +62,10 @@ jobs:
           git push origin v$VERSION
       
       - name: Create GitHub Release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: v${{ steps.tag.outputs.version }}
-          release_name: FlutterForge CLI v${{ steps.tag.outputs.version }}
-          body: |
-            ## 🚀 What's New in v${{ steps.tag.outputs.version }}
+        run: |
+          gh release create v${{ steps.tag.outputs.version }} \
+            --title "FlutterForge CLI v${{ steps.tag.outputs.version }}" \
+            --notes "## 🚀 What's New in v${{ steps.tag.outputs.version }}
             
             ### ✨ Features
             - Enhanced CLI experience with beautiful progress bars
@@ -80,13 +76,13 @@ jobs:
             - Various improvements and optimizations
             
             ### 📦 Installation
-            ```bash
+            \`\`\`bash
             dart pub global activate --source git https://github.com/victorsdd01/flutter_forge.git
-            ```
+            \`\`\`
             
             ### 🔄 Update
-            ```bash
+            \`\`\`bash
             flutterforge --update
-            ```
-          draft: false
-          prerelease: false 
+            \`\`\`"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
