@@ -1,4 +1,5 @@
-
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 /// Utility class to check for the latest versions of Flutter packages
 class VersionChecker {
@@ -15,6 +16,8 @@ class VersionChecker {
     'equatable': '^2.0.7',
   };
 
+  static const String _githubApiUrl = 'https://api.github.com/repos/victorsdd01/flutter_forge/releases/latest';
+  
   /// Get the latest version for a specific package
   static String getLatestVersion(String packageName) {
     return _latestVersions[packageName] ?? '^1.0.0';
@@ -52,5 +55,46 @@ class VersionChecker {
     });
     
     return summary.toString();
+  }
+
+  /// Get the latest CLI version from GitHub releases
+  static Future<String?> getLatestCLIVersion() async {
+    try {
+      final response = await http.get(Uri.parse(_githubApiUrl));
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['tag_name']?.toString().replaceFirst('v', '');
+      }
+    } catch (e) {
+      // Silently fail - network issues shouldn't break the CLI
+    }
+    
+    return null;
+  }
+  
+  /// Check if an update is available
+  static Future<bool> isUpdateAvailable(String currentVersion) async {
+    final latestVersion = await getLatestCLIVersion();
+    if (latestVersion == null) return false;
+    
+    return _compareVersions(currentVersion, latestVersion) < 0;
+  }
+  
+  /// Compare two version strings
+  static int _compareVersions(String version1, String version2) {
+    final parts1 = version1.split('.').map(int.parse).toList();
+    final parts2 = version2.split('.').map(int.parse).toList();
+    
+    // Pad with zeros if needed
+    while (parts1.length < parts2.length) parts1.add(0);
+    while (parts2.length < parts1.length) parts2.add(0);
+    
+    for (int i = 0; i < parts1.length; i++) {
+      if (parts1[i] < parts2[i]) return -1;
+      if (parts1[i] > parts2[i]) return 1;
+    }
+    
+    return 0;
   }
 } 
