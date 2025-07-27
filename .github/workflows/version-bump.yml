@@ -1,0 +1,91 @@
+name: Version Bump
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+
+jobs:
+  version-bump:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Setup Dart
+        uses: dart-lang/setup-dart@v1
+        with:
+          sdk: '3.8.0'
+      
+      - name: Determine version bump type
+        id: bump-type
+        run: |
+          # Check PR title and labels for version bump type
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          PR_LABELS="${{ github.event.pull_request.labels.*.name }}"
+          
+          if [[ "$PR_TITLE" == *"[MAJOR]"* ]] || [[ "$PR_LABELS" == *"major"* ]]; then
+            echo "bump-type=major" >> $GITHUB_OUTPUT
+          elif [[ "$PR_TITLE" == *"[MINOR]"* ]] || [[ "$PR_LABELS" == *"minor"* ]]; then
+            echo "bump-type=minor" >> $GITHUB_OUTPUT
+          else
+            echo "bump-type=patch" >> $GITHUB_OUTPUT
+          fi
+          
+          echo "Bump type: ${{ steps.bump-type.outputs.bump-type }}"
+      
+      - name: Bump version
+        run: |
+          dart run scripts/version_manager.dart ${{ steps.bump-type.outputs.bump-type }}
+      
+      - name: Commit version changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add .
+          git commit -m "🔖 Bump version to ${{ steps.bump-type.outputs.bump-type }} release"
+          git push
+      
+      - name: Create git tag
+        id: tag
+        run: |
+          VERSION=$(dart run scripts/version_manager.dart show | grep "Version:" | cut -d' ' -f4)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          git tag v$VERSION
+          git push origin v$VERSION
+          echo "Created tag: v$VERSION"
+      
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ steps.tag.outputs.version }}
+          release_name: FlutterForge CLI v${{ steps.tag.outputs.version }}
+          body: |
+            ## 🚀 What's New in v${{ steps.tag.outputs.version }}
+            
+            ### ✨ Features
+            - Enhanced CLI experience with beautiful progress bars
+            - Automatic version management
+            - Improved update system
+            
+            ### 🐛 Bug Fixes
+            - Various improvements and optimizations
+            
+            ### 📦 Installation
+            ```bash
+            dart pub global activate --source git https://github.com/victorsdd01/flutter_forge.git
+            ```
+            
+            ### 🔄 Update
+            ```bash
+            flutterforge --update
+            ```
+          draft: false
+          prerelease: false 

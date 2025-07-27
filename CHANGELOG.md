@@ -1,66 +1,108 @@
 # Changelog
 
-All notable changes to the FlutterForge CLI will be documented in this file.
+All notable changes to FlutterForge CLI will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.0] - 2024-01-XX
+## [Unreleased]
 
 ### Added
-- 🎉 **Initial Release** - FlutterForge CLI tool
-- 🎯 **Interactive Project Creation** - Guided setup with prompts
-- 🏗️ **Clean Architecture Support** - Domain, Data, and Presentation layers
-- 🔄 **State Management Options** - BLoC, Cubit, Provider, or None
-- ❄️ **Freezed Integration** - Immutable data classes and code generation
-- 🗺️ **Go Router Support** - Declarative routing with deep linking
-- 🌍 **Internationalization** - Multi-language support with ARB files
-- 📱 **Multi-Platform Support** - Mobile, Web, and Desktop platforms
-- 🔍 **Custom Linting** - Code quality and style enforcement
-- 💉 **Dependency Injection** - GetIt-based DI setup
-- 📦 **Latest Dependencies** - Always up-to-date package versions
-- 🎨 **Beautiful ASCII Art** - FlutterForge logo display
-- 📋 **Configuration Summary** - Review before project creation
-- 🔧 **Post-Generation Instructions** - Clear next steps for users
+- Version management system with automatic bumping
+- GitHub Actions workflow for automated releases
+- CHANGELOG.md for tracking version history
+
+## [1.1.0] - 2024-12-27
+
+### Added
+- ✨ Beautiful animated progress bar for CLI updates
+- 🎊 Completion celebration animation
+- 🔄 Enhanced update system with version checking
+- 🎨 Improved CLI styling with colors and emojis
+- 📊 Step-by-step progress visualization
+- 🎯 Spinning animations during updates
+
+### Changed
+- 🎨 Enhanced CLI appearance with professional styling
+- 📋 Improved help and version display
+- 🚀 Better user experience with visual feedback
+
+### Fixed
+- 🔧 Resolved dependency injection issues
+- 🐛 Fixed CLI controller method signatures
+- 🔧 Corrected import paths and class references
+
+## [1.0.0] - 2024-12-27
+
+### Added
+- 🚀 Initial FlutterForge CLI release
+- 📝 Interactive project configuration
+- 🌍 Multi-platform support (Mobile, Web, Desktop)
+- 🎯 State management options (BLoC, Cubit, Provider)
+- 🏛️ Clean Architecture integration
+- 🛣️ Go Router navigation support
+- ❄️ Freezed code generation
+- 🔍 Custom linter rules
+- 🌐 Internationalization support
+- 📦 Dependency injection with GetIt
+- 🔄 Update and uninstall functionality
+- 📚 Comprehensive documentation
+- 🎨 Beautiful CLI interface with colors and styling
 
 ### Features
-- Interactive prompts for project configuration
-- Platform selection (Mobile, Web, Desktop)
-- State management selection with dependencies
-- Freezed code generation setup
-- Go Router integration with sample pages
+- Interactive prompts for project setup
+- Platform selection (Android, iOS, Web, Windows, macOS, Linux)
+- State management configuration
 - Clean Architecture structure generation
-- Custom linter rules configuration
-- Internationalization setup with ARB files
-- Dependency injection with GetIt
-- Barrel files for each layer
-- Sample implementations for all patterns
-
-### Dependencies Included
-- **State Management**: flutter_bloc, hydrated_bloc, replay_bloc, bloc_concurrency, dartz, equatable
-- **Navigation**: go_router
-- **DI**: get_it
-- **Code Generation**: json_annotation, freezed_annotation, freezed, json_serializable, build_runner
-- **Internationalization**: flutter_localizations, intl, intl_utils
-- **Utilities**: path_provider
-
-### Technical Details
-- Clean Architecture implementation
-- Proper dependency management
-- Error handling and validation
-- Cross-platform compatibility
-- Comprehensive testing structure
-- Documentation and examples
+- Go Router setup with sample pages
+- Freezed integration for immutable data classes
+- Custom linter rules for code quality
+- Internationalization with ARB files
+- Cross-platform installation scripts
+- Version checking and update system
+- Professional CLI styling and animations
 
 ---
 
-## [Unreleased]
+## Version Bumping Guidelines
 
-### Planned Features
-- Non-interactive mode support
-- Template customization
-- Plugin system
-- Advanced configuration options
+### Patch (1.0.0 → 1.0.1)
+- Bug fixes
+- Minor improvements
+- Documentation updates
 - Performance optimizations
-- Additional state management patterns
-- More platform-specific configurations
+
+### Minor (1.0.0 → 1.1.0)
+- New features
+- Enhanced functionality
+- UI/UX improvements
+- New configuration options
+
+### Major (1.0.0 → 2.0.0)
+- Breaking changes
+- Major architectural changes
+- Significant feature additions
+- Incompatible API changes
+
+## Automatic Version Bumping
+
+This project uses GitHub Actions to automatically bump versions when PRs are merged to main:
+
+- **Default**: Patch bump (1.0.0 → 1.0.1)
+- **[MINOR] in PR title**: Minor bump (1.0.0 → 1.1.0)
+- **[MAJOR] in PR title**: Major bump (1.0.0 → 2.0.0)
+- **Labels**: Use `minor` or `major` labels for automatic detection
+
+## Manual Version Management
+
+Use the version manager script:
+
+```bash
+# Show current version
+dart run scripts/version_manager.dart show
+
+# Bump versions
+dart run scripts/version_manager.dart patch   # 1.0.0 → 1.0.1
+dart run scripts/version_manager.dart minor   # 1.0.0 → 1.1.0
+dart run scripts/version_manager.dart major   # 1.0.0 → 2.0.0
+```
