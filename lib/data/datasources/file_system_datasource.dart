@@ -1567,6 +1567,7 @@ abstract class BaseRepository {
   String _generateSampleEntityContent(bool includeFreezed) {
     if (includeFreezed) {
       return '''import 'package:freezed_annotation/freezed_annotation.dart';
+import '../../data/models/sample_model.dart';
 
 part 'sample_entity.freezed.dart';
 part 'sample_entity.g.dart';
@@ -1592,6 +1593,7 @@ abstract class SampleEntity with _\$SampleEntity {
     } else {
       return '''import 'package:equatable/equatable.dart';
 import 'base_entity.dart';
+import '../../data/models/sample_model.dart';
 
 /// Sample entity for demonstration
 class SampleEntity extends BaseEntity {
@@ -1985,8 +1987,8 @@ class _HomePageState extends State<HomePage> {
   String _generateSampleDataSourceContent() {
     return '''
 import 'package:dartz/dartz.dart';
-import '../../domain/entities/sample_entity.dart';
 import '../../core/errors/failures.dart';
+import '../models/sample_model.dart';
 
 /// Sample data source interface
 abstract class SampleDataSource {
@@ -2138,6 +2140,7 @@ import '../../domain/entities/sample_entity.dart';
 import '../../domain/repositories/sample_repository.dart';
 import '../../core/errors/failures.dart';
 import '../datasources/sample_data_source.dart';
+import '../models/sample_model.dart';
 
 /// Implementation of SampleRepository
 class SampleRepositoryImpl implements SampleRepository {
@@ -2294,7 +2297,6 @@ class SampleModel with _\$SampleModel {
     name: entity.name,
     description: entity.description,
   );
-}
 }
 ''';
     } else {
@@ -2570,7 +2572,6 @@ class AppLocalizationsSetup {
   String _generateFreezedBlocContent() {
     return '''import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hydrated_bloc/hydrated_bloc.dart';
-import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:dartz/dartz.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import '../../../core/errors/failures.dart';
