@@ -10,7 +10,7 @@ import 'presentation/controllers/cli_controller.dart';
 class FlutterForgeCLI {
   static const String _appName = 'flutterforce';
   static const String _description = 'A Flutter CLI tool for creating projects with interactive prompts.';
-  static const String _version = '1.0.0';
+  static const String _version = '1.1.0';
 
   late ArgParser _argParser;
   late ArgResults _argResults;
@@ -270,7 +270,7 @@ class FlutterForgeCLI {
       print('${brightRed}${bold}❌ Update failed:${reset} ${red}$e${reset}');
       print('');
       print('${brightYellow}${bold}💡 Manual update:${reset}');
-      print('${dim}   dart pub global activate --source git https://github.com/victorsdd01/flutter_forge.git${reset}');
+      print('${dim}   flutterforge -u${reset} ${dim}or${reset} ${dim}flutterforge --update${reset}');
       print('');
     }
   }
