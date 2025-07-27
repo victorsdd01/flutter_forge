@@ -39,8 +39,5 @@ class DependencyInjection {
   ValidateProjectConfigUseCase get validateProjectConfigUseCase => ValidateProjectConfigUseCase();
 
   // Controllers
-  CLIController get cliController => CLIController(
-        createProjectUseCase: createProjectUseCase,
-        validateProjectConfigUseCase: validateProjectConfigUseCase,
-      );
+    CliController get cliController => CliController(projectRepository);
 } 

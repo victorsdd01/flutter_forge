@@ -12,7 +12,7 @@ class FlutterForgeCLI {
 
   late ArgParser _argParser;
   late ArgResults _argResults;
-  late CLIController _cliController;
+  late CliController _cliController;
 
   FlutterForgeCLI() {
     _setupArgParser();
@@ -21,31 +21,6 @@ class FlutterForgeCLI {
 
   void _setupArgParser() {
     _argParser = ArgParser()
-      ..addOption(
-        'org',
-        abbr: 'o',
-        help: 'Organization name for the Flutter project',
-        defaultsTo: '',
-      )
-      ..addOption(
-        'state-management',
-        abbr: 's',
-        help: 'State management solution (bloc, cubit, provider)',
-        allowed: ['bloc', 'cubit', 'provider', 'none'],
-        defaultsTo: 'none',
-      )
-      ..addOption(
-        'project-name',
-        abbr: 'p',
-        help: 'Project name',
-        defaultsTo: '',
-      )
-      ..addFlag(
-        'interactive',
-        abbr: 'i',
-        help: 'Run in interactive mode',
-        defaultsTo: true,
-      )
       ..addFlag(
         'help',
         abbr: 'h',
@@ -79,11 +54,8 @@ class FlutterForgeCLI {
         return;
       }
 
-      if (_argResults['interactive']) {
-        _runInteractiveMode();
-      } else {
-        _runNonInteractiveMode();
-      }
+      // Always run in interactive mode
+      _runInteractiveMode();
     } catch (e) {
       print('Error: $e');
       _printUsage();
@@ -95,56 +67,63 @@ class FlutterForgeCLI {
     _cliController.runInteractiveMode();
   }
 
-  void _runNonInteractiveMode() {
-    final projectName = _argResults['project-name'];
-    final orgName = _argResults['org'];
-    final stateManagementStr = _argResults['state-management'];
-
-    if (projectName.isEmpty || orgName.isEmpty) {
-      print('Error: Project name and organization name are required in non-interactive mode.');
-      print('Use --help for more information.');
-      exit(1);
-    }
-
-    final stateManagement = _parseStateManagement(stateManagementStr);
-    
-    final config = ProjectConfig(
-      projectName: projectName,
-      organizationName: orgName,
-      stateManagement: stateManagement,
-    );
-
-    _cliController.runNonInteractiveMode(config);
-  }
-
-  StateManagementType _parseStateManagement(String value) {
-    switch (value) {
-      case 'bloc':
-        return StateManagementType.bloc;
-      case 'cubit':
-        return StateManagementType.cubit;
-      case 'provider':
-        return StateManagementType.provider;
-      case 'none':
-      default:
-        return StateManagementType.none;
-    }
-  }
-
   void _printVersion() {
-    print('$_appName version $_version');
-    print(_description);
+    // ANSI Color Codes
+    const String reset = '\x1B[0m';
+    const String bold = '\x1B[1m';
+    const String brightCyan = '\x1B[96m';
+    const String brightMagenta = '\x1B[95m';
+    const String brightGreen = '\x1B[92m';
+    const String brightYellow = '\x1B[93m';
+    const String dim = '\x1B[2m';
+    
     print('');
-    print('Repository: https://github.com/victorsdd01/flutter_forge');
-    print('To update: dart pub global activate --source git https://github.com/victorsdd01/flutter_forge.git');
+    print('${brightCyan}${bold}╔══════════════════════════════════════════════════════════════╗${reset}');
+    print('${brightCyan}${bold}║${reset}${brightMagenta}${bold}                    🚀 FLUTTER FORCE CLI 🚀                    ${reset}${brightCyan}${bold}║${reset}');
+    print('${brightCyan}${bold}║${reset}${dim}           The Ultimate Flutter Project Generator           ${reset}${brightCyan}${bold}║${reset}');
+    print('${brightCyan}${bold}╚══════════════════════════════════════════════════════════════╝${reset}');
+    print('');
+    print('${brightGreen}${bold}📦 Version:${reset} ${brightYellow}$_version${reset}');
+    print('${brightGreen}${bold}📝 Description:${reset} ${dim}$_description${reset}');
+    print('');
+    print('${brightCyan}${bold}🔗 Repository:${reset} ${dim}https://github.com/victorsdd01/flutter_forge${reset}');
+    print('${brightCyan}${bold}🔄 To update:${reset} ${dim}dart pub global activate --source git https://github.com/victorsdd01/flutter_forge.git${reset}');
+    print('');
+    print('${brightMagenta}${bold}✨ Happy coding with Flutter Force! ✨${reset}');
+    print('');
   }
 
   void _printUsage() {
-    print('$_appName - $_description');
+    // ANSI Color Codes
+    const String reset = '\x1B[0m';
+    const String bold = '\x1B[1m';
+    const String brightCyan = '\x1B[96m';
+    const String brightGreen = '\x1B[92m';
+    const String dim = '\x1B[2m';
+    
     print('');
-    print('Usage: $_appName [options]');
+    print('${brightCyan}${bold}╔══════════════════════════════════════════════════════════════╗${reset}');
+    print('${brightCyan}${bold}║${reset}${bold}                    🚀 FLUTTER FORCE CLI 🚀                    ${reset}${brightCyan}${bold}║${reset}');
+    print('${brightCyan}${bold}╚══════════════════════════════════════════════════════════════╝${reset}');
     print('');
-    print('Options:');
-    print(_argParser.usage);
+    print('${brightGreen}${bold}📝 Description:${reset} ${dim}$_description${reset}');
+    print('');
+    print('${brightGreen}${bold}🚀 Usage:${reset}');
+    print('${dim}   $_appName${reset} ${brightCyan}${bold}# Start interactive project creation${reset}');
+    print('${dim}   $_appName --help${reset} ${brightCyan}${bold}# Show this help message${reset}');
+    print('${dim}   $_appName --version${reset} ${brightCyan}${bold}# Show version information${reset}');
+    print('');
+    print('${brightGreen}${bold}✨ Features:${reset}');
+    print('${dim}   • Interactive project configuration${reset}');
+    print('${dim}   • Multiple platform support (Mobile, Web, Desktop)${reset}');
+    print('${dim}   • State management options (BLoC, Cubit, Provider)${reset}');
+    print('${dim}   • Clean Architecture integration${reset}');
+    print('${dim}   • Go Router navigation${reset}');
+    print('${dim}   • Freezed code generation${reset}');
+    print('${dim}   • Custom linter rules${reset}');
+    print('${dim}   • Internationalization support${reset}');
+    print('');
+    print('${brightCyan}${bold}🔗 Repository:${reset} ${dim}https://github.com/victorsdd01/flutter_forge${reset}');
+    print('');
   }
 }
