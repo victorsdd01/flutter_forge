@@ -277,6 +277,42 @@ git pull origin main
 dart pub global activate --source path .
 ```
 
+## 🗑️ Uninstalling FlutterForge CLI
+
+### **Manual Uninstall:**
+```bash
+# Deactivate the package
+dart pub global deactivate flutterforge
+
+# Remove from PATH manually if needed
+# Edit your shell config file (~/.bashrc, ~/.zshrc, etc.)
+```
+
+### **Using Uninstall Scripts:**
+
+#### **Windows:**
+```cmd
+# Using batch script
+uninstall.bat
+
+# Using PowerShell script
+powershell -ExecutionPolicy Bypass -File uninstall.ps1
+```
+
+#### **macOS/Linux:**
+```bash
+# Using shell script
+./uninstall.sh
+```
+
+### **Verify Uninstall:**
+```bash
+# Check if CLI is still available
+flutterforge --version
+
+# Should show "command not found" or similar error
+```
+
 ## 🤝 Contributing
 
 1. Fork the repository
