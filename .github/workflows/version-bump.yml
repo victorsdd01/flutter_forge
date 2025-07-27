@@ -85,4 +85,11 @@ jobs:
             flutterforge --update
             \`\`\`"
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Report Status
+        run: |
+          echo "✅ Version bump workflow completed successfully"
+          echo "Version: ${{ steps.tag.outputs.version }}"
+          echo "Tag: v${{ steps.tag.outputs.version }}"
+          echo "Release: FlutterForge CLI v${{ steps.tag.outputs.version }}" 
