@@ -6,40 +6,14 @@ on:
     branches:
       - main
 
-# Add explicit permissions for the workflow
 permissions:
   contents: write
   pull-requests: read
 
 jobs:
-  # Debug job to understand what's happening
-  debug:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Debug PR Information
-        run: |
-          echo "🔍 Debugging PR Information:"
-          echo "PR Number: ${{ github.event.pull_request.number }}"
-          echo "PR Title: ${{ github.event.pull_request.title }}"
-          echo "PR State: ${{ github.event.pull_request.state }}"
-          echo "PR Merged: ${{ github.event.pull_request.merged }}"
-          echo "PR Merged By: ${{ github.event.pull_request.merged_by.login }}"
-          echo "Event Type: ${{ github.event_name }}"
-          echo "Event Action: ${{ github.event.action }}"
-          echo "Base Branch: ${{ github.event.pull_request.base.ref }}"
-          echo "Head Branch: ${{ github.event.pull_request.head.ref }}"
-          
-          if [[ "${{ github.event.pull_request.merged }}" == "true" ]]; then
-            echo "✅ PR is merged - Version bump will proceed"
-          else
-            echo "❌ PR is not merged - Version bump will be skipped"
-            echo "   This workflow only runs when PRs are merged to main"
-          fi
-
   version-bump:
     if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
-    needs: debug
     
     steps:
       - name: Checkout code
@@ -55,51 +29,36 @@ jobs:
       - name: Determine version bump type
         id: bump-type
         run: |
-          # Check PR title and labels for version bump type
           PR_TITLE="${{ github.event.pull_request.title }}"
           PR_LABELS="${{ github.event.pull_request.labels.*.name }}"
           
-          echo "🔍 Analyzing PR for version bump type:"
-          echo "PR Title: $PR_TITLE"
-          echo "PR Labels: $PR_LABELS"
-          
           if [[ "$PR_TITLE" == *"[MAJOR]"* ]] || [[ "$PR_LABELS" == *"major"* ]]; then
             echo "bump-type=major" >> $GITHUB_OUTPUT
-            echo "🎯 Detected MAJOR version bump"
           elif [[ "$PR_TITLE" == *"[MINOR]"* ]] || [[ "$PR_LABELS" == *"minor"* ]]; then
             echo "bump-type=minor" >> $GITHUB_OUTPUT
-            echo "🎯 Detected MINOR version bump"
           else
             echo "bump-type=patch" >> $GITHUB_OUTPUT
-            echo "🎯 Defaulting to PATCH version bump"
           fi
-          
-          echo "Bump type: ${{ steps.bump-type.outputs.bump-type }}"
       
       - name: Bump version
         run: |
-          echo "🚀 Starting version bump process..."
           dart run scripts/version_manager.dart ${{ steps.bump-type.outputs.bump-type }}
       
       - name: Commit version changes
         run: |
-          echo "📝 Committing version changes..."
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add .
           git commit -m "🔖 Bump version to ${{ steps.bump-type.outputs.bump-type }} release"
           git push
-          echo "✅ Version changes committed and pushed"
       
       - name: Create git tag
         id: tag
         run: |
-          echo "🏷️ Creating git tag..."
           VERSION=$(dart run scripts/version_manager.dart show | grep "Version:" | cut -d' ' -f4)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           git tag v$VERSION
           git push origin v$VERSION
-          echo "✅ Created and pushed tag: v$VERSION"
       
       - name: Create GitHub Release
         uses: actions/create-release@v1
