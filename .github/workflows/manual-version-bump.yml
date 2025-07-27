@@ -1,0 +1,86 @@
+name: Manual Version Bump
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: 'Version bump type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+
+jobs:
+  manual-version-bump:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Setup Dart
+        uses: dart-lang/setup-dart@v1
+        with:
+          sdk: '3.8.0'
+      
+      - name: Show current version
+        run: |
+          echo "📦 Current version:"
+          dart run scripts/version_manager.dart show
+      
+      - name: Bump version
+        run: |
+          echo "🚀 Bumping version to ${{ github.event.inputs.version_type }}..."
+          dart run scripts/version_manager.dart ${{ github.event.inputs.version_type }}
+      
+      - name: Commit version changes
+        run: |
+          echo "📝 Committing version changes..."
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add .
+          git commit -m "🔖 Manual version bump to ${{ github.event.inputs.version_type }} release"
+          git push
+          echo "✅ Version changes committed and pushed"
+      
+      - name: Create git tag
+        id: tag
+        run: |
+          echo "🏷️ Creating git tag..."
+          VERSION=$(dart run scripts/version_manager.dart show | grep "Version:" | cut -d' ' -f4)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          git tag v$VERSION
+          git push origin v$VERSION
+          echo "✅ Created and pushed tag: v$VERSION"
+      
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ steps.tag.outputs.version }}
+          release_name: FlutterForge CLI v${{ steps.tag.outputs.version }}
+          body: |
+            ## 🚀 Manual Release v${{ steps.tag.outputs.version }}
+            
+            This release was created manually via GitHub Actions.
+            
+            ### 📦 Installation
+            ```bash
+            dart pub global activate --source git https://github.com/victorsdd01/flutter_forge.git
+            ```
+            
+            ### 🔄 Update
+            ```bash
+            flutterforge --update
+            ```
+          draft: false
+          prerelease: false 
