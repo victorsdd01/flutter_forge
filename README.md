@@ -249,6 +249,34 @@ flutter pub get
 flutter run
 ```
 
+## 🔄 Updating FlutterForge CLI
+
+### **Check Current Version:**
+```bash
+# Using direct command (recommended)
+dart run bin/flutterforge.dart --version
+
+# Or check the installed version
+dart pub global list | grep flutterforge
+```
+
+### **Update to Latest Version:**
+```bash
+# Update to latest version from Git
+dart pub global activate --source git https://github.com/victorsdd01/flutter_forge.git
+
+# Or if you want a specific version
+dart pub global activate --source git https://github.com/victorsdd01/flutter_forge.git --git-ref v1.1.0
+```
+
+### **Update from Local Source:**
+```bash
+# If you have the repository cloned locally
+cd flutter_forge
+git pull origin main
+dart pub global activate --source path .
+```
+
 ## 🤝 Contributing
 
 1. Fork the repository

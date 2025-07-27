@@ -8,6 +8,7 @@ import 'presentation/controllers/cli_controller.dart';
 class FlutterForgeCLI {
   static const String _appName = 'flutterforce';
   static const String _description = 'A Flutter CLI tool for creating projects with interactive prompts.';
+  static const String _version = '1.0.0';
 
   late ArgParser _argParser;
   late ArgResults _argResults;
@@ -50,6 +51,12 @@ class FlutterForgeCLI {
         abbr: 'h',
         help: 'Show this help message',
         negatable: false,
+      )
+      ..addFlag(
+        'version',
+        abbr: 'v',
+        help: 'Show version information',
+        negatable: false,
       );
   }
 
@@ -64,6 +71,11 @@ class FlutterForgeCLI {
 
       if (_argResults['help']) {
         _printUsage();
+        return;
+      }
+
+      if (_argResults['version']) {
+        _printVersion();
         return;
       }
 
@@ -117,6 +129,14 @@ class FlutterForgeCLI {
       default:
         return StateManagementType.none;
     }
+  }
+
+  void _printVersion() {
+    print('$_appName version $_version');
+    print(_description);
+    print('');
+    print('Repository: https://github.com/victorsdd01/flutter_forge');
+    print('To update: dart pub global activate --source git https://github.com/victorsdd01/flutter_forge.git');
   }
 
   void _printUsage() {
