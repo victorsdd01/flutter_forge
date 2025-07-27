@@ -170,7 +170,7 @@ flutter_intl:
 ''';
       
       // Add flutter_intl configuration at the end
-      pubspecContent = pubspecContent + '\n$flutterIntlConfig';
+      pubspecContent = '$pubspecContent\n$flutterIntlConfig';
     }
     
     pubspecFile.writeAsStringSync(pubspecContent);

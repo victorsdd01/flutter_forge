@@ -6,6 +6,10 @@ on:
     branches:
       - main
 
+permissions:
+  contents: write
+  pull-requests: read
+
 jobs:
   version-bump:
     if: github.event.pull_request.merged == true
@@ -25,7 +29,6 @@ jobs:
       - name: Determine version bump type
         id: bump-type
         run: |
-          # Check PR title and labels for version bump type
           PR_TITLE="${{ github.event.pull_request.title }}"
           PR_LABELS="${{ github.event.pull_request.labels.*.name }}"
           
@@ -36,8 +39,6 @@ jobs:
           else
             echo "bump-type=patch" >> $GITHUB_OUTPUT
           fi
-          
-          echo "Bump type: ${{ steps.bump-type.outputs.bump-type }}"
       
       - name: Bump version
         run: |
@@ -58,7 +59,6 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           git tag v$VERSION
           git push origin v$VERSION
-          echo "Created tag: v$VERSION"
       
       - name: Create GitHub Release
         uses: actions/create-release@v1
