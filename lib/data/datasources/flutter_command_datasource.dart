@@ -13,6 +13,10 @@ abstract class FlutterCommandDataSource {
   });
   
   Future<bool> isFlutterInstalled();
+  
+  Future<void> generateLocalizationFiles(String projectName);
+  
+  Future<void> cleanBuildCache(String projectName);
 }
 
 /// Implementation of FlutterCommandDataSource
@@ -94,6 +98,56 @@ class FlutterCommandDataSourceImpl implements FlutterCommandDataSource {
       return result.exitCode == 0;
     } catch (e) {
       return false;
+    }
+  }
+
+  @override
+  Future<void> generateLocalizationFiles(String projectName) async {
+    try {
+      // Run flutter gen-l10n to generate localization files
+      final result = await Process.run(
+        'flutter',
+        ['gen-l10n'],
+        workingDirectory: projectName,
+      );
+
+      if (result.exitCode != 0) {
+        // If flutter gen-l10n fails, try dart run intl_utils:generate as fallback
+        final fallbackResult = await Process.run(
+          'dart',
+          ['run', 'intl_utils:generate'],
+          workingDirectory: projectName,
+        );
+
+        if (fallbackResult.exitCode != 0) {
+          print('Warning: Failed to generate localization files. You may need to run "dart run intl_utils:generate" manually.');
+        }
+      }
+    } catch (e) {
+      print('Warning: Failed to generate localization files: $e');
+    }
+  }
+
+  @override
+  Future<void> cleanBuildCache(String projectName) async {
+    try {
+      // Run flutter clean to clear build cache
+      final result = await Process.run(
+        'flutter',
+        ['clean'],
+        workingDirectory: projectName,
+      );
+
+      if (result.exitCode == 0) {
+        // Run flutter pub get to restore dependencies
+        await Process.run(
+          'flutter',
+          ['pub', 'get'],
+          workingDirectory: projectName,
+        );
+      }
+    } catch (e) {
+      print('Warning: Failed to clean build cache: $e');
     }
   }
 }

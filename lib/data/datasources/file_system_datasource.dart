@@ -151,17 +151,23 @@ class FileSystemDataSourceImpl implements FileSystemDataSource {
       }
     }
 
-    // Add flutter_intl configuration if not present
-    if (!pubspecContent.contains('flutter_intl:')) {
-      final flutterIntlConfig = '''
-flutter_intl:
-  enabled: true
-  arb_dir: lib/application/l10n
-  output_dir: lib/application/generated
+    // Add localization configuration if not present
+    if (!pubspecContent.contains('arb-dir:')) {
+      final localizationConfig = '''
+# Localization configuration
+arb-dir: lib/application/l10n
+template-arb-file: intl_en.arb
+output-localization-file: app_localizations.dart
 ''';
       
-      // Add flutter_intl configuration at the end
-      pubspecContent = '$pubspecContent\n$flutterIntlConfig';
+      // Add localization configuration before the flutter section
+      final flutterSectionIndex = pubspecContent.indexOf('# The following section is specific to Flutter packages.');
+      if (flutterSectionIndex != -1) {
+        pubspecContent = '${pubspecContent.substring(0, flutterSectionIndex)}$localizationConfig\n${pubspecContent.substring(flutterSectionIndex)}';
+      } else {
+        // Fallback: add at the end
+        pubspecContent = '$pubspecContent\n$localizationConfig';
+      }
     }
     
     pubspecFile.writeAsStringSync(pubspecContent);
@@ -2502,7 +2508,7 @@ export 'providers/counter_provider.dart';
     return '''
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import '../l10n.dart';
 
 class AppLocalizationsSetup {
   static final List<Locale> supportedLocales = S.delegate.supportedLocales;

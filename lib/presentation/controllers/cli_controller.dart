@@ -304,6 +304,10 @@ class CliController {
       print('${_dim}   flutter pub get${_reset}');
       print('${_dim}   flutter run${_reset}');
       
+      print('');
+      print('${_brightYellow}${_bold}🌍 For localization (if needed):${_reset}');
+      print('${_dim}   dart run intl_utils:generate${_reset}');
+      
       if (config.includeFreezed) {
         print('');
         print('${_brightYellow}${_bold}❄️  For Freezed code generation:${_reset}');
