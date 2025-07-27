@@ -1,274 +1,265 @@
-# 🚀 FlutterForge CLI
+# FlutterForge
 
-A powerful Flutter CLI tool for creating projects with interactive prompts, supporting Clean Architecture, BLoC, Freezed, Go Router, and internationalization.
+A powerful Flutter CLI tool for creating projects with interactive prompts and state management templates, built with Clean Architecture principles.
 
-## ✨ Features
+## 🏗️ Architecture
 
-- 🎯 **Interactive Project Creation** - Guided setup with prompts
-- 🏗️ **Clean Architecture** - Domain, Data, and Presentation layers
-- 🔄 **State Management** - BLoC, Cubit, Provider, or None
-- ❄️ **Freezed Support** - Immutable data classes and code generation
-- 🗺️ **Go Router** - Declarative routing with deep linking
-- 🌍 **Internationalization** - Multi-language support with ARB files
-- 📱 **Multi-Platform** - Mobile, Web, and Desktop support
-- 🔍 **Custom Linting** - Code quality and style enforcement
-- 💉 **Dependency Injection** - GetIt-based DI setup
-- 📦 **Latest Dependencies** - Always up-to-date package versions
+This project follows Clean Architecture principles with clear separation of concerns:
 
-## 🛠️ Installation
+```
+lib/
+├── core/
+│   └── di/
+│       └── dependency_injection.dart    # Dependency injection container
+├── data/
+│   ├── datasources/
+│   │   ├── file_system_datasource.dart  # File system operations
+│   │   └── flutter_command_datasource.dart # Flutter CLI operations
+│   └── repositories/
+│       └── project_repository_impl.dart # Repository implementation
+├── domain/
+│   ├── entities/
+│   │   └── project_config.dart          # Core business entities
+│   ├── repositories/
+│   │   └── project_repository.dart      # Repository interfaces
+│   └── usecases/
+│       ├── create_project_usecase.dart  # Business logic for project creation
+│       └── validate_project_config_usecase.dart # Validation logic
+├── presentation/
+│   └── controllers/
+│       └── cli_controller.dart          # CLI interaction logic
+└── vmgv_cli.dart                        # Main CLI entry point
+```
 
-### **Cross-Platform Support**
-FlutterForge CLI works on **Windows**, **macOS**, and **Linux**! 🪟🍎🐧
+### Architecture Layers
 
-### Option 1: Install from Git (Recommended)
+- **Domain Layer**: Contains business entities, use cases, and repository interfaces
+- **Data Layer**: Contains repository implementations and data sources
+- **Presentation Layer**: Contains controllers for user interaction
+- **Core**: Contains dependency injection and shared utilities
+
+## Features
+
+- 🚀 **Interactive Project Creation**: Guided setup with prompts for project configuration
+- 🏢 **Organization Name Support**: Automatically sets the `--org` parameter for Flutter projects
+- 🔄 **State Management Templates**: Choose from BLoC, Cubit, or Provider with pre-configured templates
+- 📦 **Dependency Management**: Automatically adds required dependencies to `pubspec.yaml`
+- 🎯 **Ready-to-Run**: Generated projects are immediately runnable with sample code
+- 🧪 **Testable**: Clean architecture makes the code highly testable
+- 🔧 **Maintainable**: Clear separation of concerns for easy maintenance
+
+## Installation
+
+1. Clone this repository:
+```bash
+git clone <repository-url>
+cd vmgv_cli
+```
+
+2. Install dependencies:
+```bash
+dart pub get
+```
+
+3. Make the CLI executable:
+```bash
+dart compile exe bin/vmgv_cli.dart -o vmgv_cli
+```
+
+4. Add to your PATH (optional):
+```bash
+export PATH="$PATH:$(pwd)"
+```
+
+## Usage
+
+### Interactive Mode (Default)
+
+Run the CLI without arguments to start interactive mode:
 
 ```bash
-# All platforms
-dart pub global activate --source git https://github.com/yourusername/flutterforge.git
+dart run bin/vmgv_cli.dart
 ```
 
-### Option 2: Install from Local Source
-
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/flutterforge.git
-cd flutterforge
-
-# Install globally
-dart pub global activate --source path .
-```
-
-### Option 3: Use Installation Scripts
-
-#### **Windows**
-```cmd
-# Using batch script
-git clone https://github.com/yourusername/flutterforge.git
-cd flutterforge
-install.bat
-
-# Using PowerShell script
-git clone https://github.com/yourusername/flutterforge.git
-cd flutterforge
-powershell -ExecutionPolicy Bypass -File install.ps1
-```
-
-#### **macOS/Linux**
-```bash
-# Using shell script
-git clone https://github.com/yourusername/flutterforge.git
-cd flutterforge
-./install.sh
-```
-
-### Option 4: Install from Pub.dev (When Published)
-
-```bash
-dart pub global activate flutterforge
-```
-
-## 🚀 Usage
-
-### Basic Usage
-
-```bash
-# Create a new Flutter project interactively
-flutterforge
-
-# Or with the full command
-dart pub global run flutterforge
-```
+The CLI will prompt you for:
+- Project name
+- Organization name (e.g., `com.example`)
+- State management solution (BLoC, Cubit, Provider, or None)
 
 ### Command Line Options
 
+You can also use command line arguments for non-interactive usage:
+
 ```bash
-# Show help
-flutterforge --help
-
-# Create project with specific name
-flutterforge create my_app
-
-# Run in non-interactive mode (future feature)
-flutterforge create my_app --non-interactive
+dart run bin/vmgv_cli.dart --project-name my_app --org com.example --state-management bloc
 ```
 
-## 📋 Interactive Prompts
+#### Available Options
 
-The CLI will guide you through the following options:
+- `--project-name, -p`: Project name
+- `--org, -o`: Organization name (e.g., com.example)
+- `--state-management, -s`: State management solution (bloc, cubit, provider, none)
+- `--interactive, -i`: Run in interactive mode (default: true)
+- `--help, -h`: Show help message
 
-1. **Project Details**
-   - Project name
-   - Organization name
+### Examples
 
-2. **Platform Selection**
-   - Mobile (Android/iOS)
-   - Web
-   - Desktop (Windows/macOS/Linux)
-   - Custom selection
+#### Create a basic Flutter project:
+```bash
+dart run bin/vmgv_cli.dart --project-name my_app --org com.example
+```
 
-3. **State Management**
-   - BLoC (Business Logic Component)
-   - Cubit (Simplified BLoC)
-   - Provider
-   - None
+#### Create a project with BLoC:
+```bash
+dart run bin/vmgv_cli.dart --project-name my_app --org com.example --state-management bloc
+```
 
-4. **Freezed Configuration** (if BLoC selected)
-   - Enable Freezed for immutable data classes
-   - Code generation setup
+#### Create a project with Provider:
+```bash
+dart run bin/vmgv_cli.dart --project-name my_app --org com.example --state-management provider
+```
 
-5. **Navigation**
-   - Go Router integration
-   - Sample pages and routes
+## State Management Templates
 
-6. **Architecture**
-   - Clean Architecture structure
-   - Domain, Data, Presentation layers
+### BLoC Template
+- Creates `lib/blocs/` directory
+- Generates sample counter BLoC with events and states
+- Adds `flutter_bloc` and `equatable` dependencies
+- Updates `main.dart` with BLoC integration
 
-7. **Code Quality**
-   - Custom linter rules
-   - Analysis options
+### Cubit Template
+- Creates `lib/cubits/` directory
+- Generates sample counter Cubit with state management
+- Adds `flutter_bloc` and `equatable` dependencies
+- Updates `main.dart` with Cubit integration
 
-8. **Internationalization**
-   - Multi-language support
-   - ARB files setup
+### Provider Template
+- Creates `lib/providers/` directory
+- Generates sample counter Provider with ChangeNotifier
+- Adds `provider` dependency
+- Updates `main.dart` with Provider integration
 
-## 🏗️ Generated Project Structure
+## Project Structure
+
+When you create a project with state management, the CLI generates the following structure:
 
 ```
 my_app/
 ├── lib/
-│   ├── core/
-│   │   ├── constants/
-│   │   ├── errors/
-│   │   ├── utils/
-│   │   └── di/
-│   ├── domain/
-│   │   ├── entities/
-│   │   ├── repositories/
-│   │   └── usecases/
-│   ├── data/
-│   │   ├── datasources/
-│   │   ├── repositories/
-│   │   └── models/
-│   ├── presentation/
-│   │   ├── pages/
-│   │   ├── widgets/
-│   │   └── controllers/
-│   ├── application/
-│   │   ├── l10n/
-│   │   └── generated/
-│   └── main.dart
-├── pubspec.yaml
-├── analysis_options.yaml
-├── build.yaml (if Freezed enabled)
-└── README.md
+│   ├── blocs/          # BLoC files (if using BLoC)
+│   ├── cubits/         # Cubit files (if using Cubit)
+│   ├── providers/      # Provider files (if using Provider)
+│   ├── models/         # Data models
+│   ├── repositories/   # Data repositories
+│   ├── services/       # Business services
+│   ├── utils/          # Utility functions
+│   └── main.dart       # Updated with state management integration
+├── pubspec.yaml        # Updated with dependencies
+└── ...                 # Other Flutter project files
 ```
 
-## 📦 Dependencies Included
+## Development
 
-### State Management
-- `flutter_bloc: ^9.1.1`
-- `hydrated_bloc: ^10.1.1`
-- `replay_bloc: ^0.3.0`
-- `bloc_concurrency: ^0.3.0`
-- `dartz: ^0.10.1`
-- `equatable: ^2.0.7`
+### Running Tests
 
-### Navigation
-- `go_router: ^16.0.0`
+The project includes comprehensive testing with multiple test types:
 
-### Dependency Injection
-- `get_it: ^8.0.3`
-
-### Code Generation (if Freezed enabled)
-- `json_annotation: ^4.9.0`
-- `freezed_annotation: ^2.4.4`
-- `freezed: ^2.5.7`
-- `json_serializable: ^6.8.0`
-- `build_runner: ^2.4.13`
-
-### Internationalization
-- `flutter_localizations: sdk: flutter`
-- `intl: any`
-- `intl_utils: ^2.8.10`
-
-### Utilities
-- `path_provider: ^2.1.5`
-
-## 🔧 Post-Generation Steps
-
-### For Freezed Projects
+#### Unit Tests
 ```bash
-cd my_app
-dart run build_runner build -d
+dart test test/vmgv_cli_test.dart
 ```
 
-### For All Projects
+#### Flow Tests
+```bash
+dart test test/flow/cli_flow_test.dart
+```
+
+#### End-to-End Tests
+```bash
+dart test test/e2e/cli_e2e_test.dart
+```
+
+#### All Tests
+```bash
+dart test
+```
+
+#### Custom Test Runner
+```bash
+dart run test/run_tests.dart
+```
+
+### Test Coverage
+
+The test suite covers:
+
+- **Unit Tests**: Core functionality, entities, use cases, and validation
+- **Flow Tests**: CLI initialization, argument parsing, and error handling
+- **Integration Tests**: Complete project creation with all state management types
+- **End-to-End Tests**: Full CLI workflow from start to finish
+
+### Test Structure
+
+```
+test/
+├── vmgv_cli_test.dart          # Unit tests for core functionality
+├── flow/
+│   └── cli_flow_test.dart      # Flow and integration tests
+├── e2e/
+│   └── cli_e2e_test.dart       # End-to-end tests
+├── test_config.dart            # Test configuration
+└── run_tests.dart              # Custom test runner
+```
+
+### Code Organization
+
+The codebase follows Clean Architecture principles:
+
+- **Domain Layer**: Contains the core business logic and entities
+- **Data Layer**: Handles data operations and external dependencies
+- **Presentation Layer**: Manages user interaction and CLI interface
+- **Dependency Injection**: Centralized dependency management
+
+### Adding New Features
+
+1. **Domain Layer**: Add new entities, use cases, or repository interfaces
+2. **Data Layer**: Implement new data sources or repository implementations
+3. **Presentation Layer**: Add new controllers or update existing ones
+4. **Dependency Injection**: Wire up new dependencies
+
+## Next Steps
+
+After creating a project:
+
+1. Navigate to the project directory:
 ```bash
 cd my_app
+```
+
+2. Install dependencies:
+```bash
 flutter pub get
-flutter analyze
+```
+
+3. Run the app:
+```bash
 flutter run
 ```
 
-## 🎯 Example Usage
+## Requirements
 
-```bash
-# Start the CLI
-flutterforge
+- Dart SDK 3.7.0 or higher
+- Flutter SDK (for creating Flutter projects)
+- Git (for version control)
 
-# Follow the interactive prompts:
-# 1. Project name: my_awesome_app
-# 2. Organization: com.example
-# 3. Platforms: Mobile (Android & iOS)
-# 4. State Management: BLoC
-# 5. Freezed: Yes
-# 6. Go Router: Yes
-# 7. Clean Architecture: Yes
-# 8. Linter Rules: Yes
-
-# Your project will be created with all configurations!
-```
-
-## 🚀 Quick Start
-
-```bash
-# Install the CLI
-dart pub global activate --source git https://github.com/yourusername/flutterforge.git
-
-# Create your first project
-flutterforge
-
-# Navigate to your project
-cd my_app
-
-# Get dependencies
-flutter pub get
-
-# Run the app
-flutter run
-```
-
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+2. Create a feature branch
+3. Make your changes following Clean Architecture principles
+4. Add tests for new functionality
+5. Submit a pull request
 
-## 📝 License
+## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- Flutter team for the amazing framework
-- BLoC library for state management
-- Freezed for code generation
-- Go Router for navigation
-- All contributors and users
-
----
-
-**Made with ❤️ for the Flutter community**
+This project is licensed under the MIT License.
