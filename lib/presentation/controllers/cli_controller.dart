@@ -39,7 +39,7 @@ class CliController {
     final includeGoRouter = _getGoRouterChoice();
     final includeCleanArchitecture = _getCleanArchitectureChoice();
     final includeLinterRules = _getLinterRulesChoice();
-    final includeFreezed = _getFreezedChoice();
+    final includeFreezed = _getFreezedChoice(stateManagement);
 
     final config = ProjectConfig(
       projectName: projectName,
@@ -219,8 +219,8 @@ class CliController {
     return _getYesNoChoice('${_brightCyan}${_bold}✨ Add custom linter rules?${_reset} ${_dim}(Enhanced code quality)${_reset}', defaultYes: false);
   }
 
-  bool _getFreezedChoice() {
-    if (_getStateManagement() == StateManagementType.bloc) {
+  bool _getFreezedChoice(StateManagementType stateManagement) {
+    if (stateManagement == StateManagementType.bloc) {
       print('');
       print('${_brightYellow}${_bold}❄️  Code Generation${_reset}');
       print('${_yellow}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${_reset}');
