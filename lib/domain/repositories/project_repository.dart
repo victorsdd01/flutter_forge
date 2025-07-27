@@ -11,6 +11,9 @@ abstract class ProjectRepository {
   /// Adds Go Router dependencies and templates to the project
   Future<void> addGoRouter(String projectName);
   
+  /// Adds Clean Architecture structure and dependencies to the project
+  Future<void> addCleanArchitecture(String projectName);
+  
   /// Validates if Flutter is installed and available
   Future<bool> isFlutterInstalled();
 } 
