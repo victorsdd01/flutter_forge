@@ -79,6 +79,96 @@ class FlutterForgeCLI {
     }
   }
 
+  Future<void> _showUpdateProgress() async {
+    const String reset = '\x1B[0m';
+    const String bold = '\x1B[1m';
+    const String brightGreen = '\x1B[92m';
+    const String brightYellow = '\x1B[93m';
+    const String brightCyan = '\x1B[96m';
+    const String brightBlue = '\x1B[94m';
+    const String dim = '\x1B[2m';
+    
+    print('${brightBlue}${bold}📊 Update Progress:${reset}');
+    print('');
+    
+    final steps = [
+      {'icon': '🔍', 'text': 'Checking for latest version', 'duration': 600},
+      {'icon': '📦', 'text': 'Downloading new version', 'duration': 1200},
+      {'icon': '⚙️', 'text': 'Installing dependencies', 'duration': 1000},
+      {'icon': '🔧', 'text': 'Updating global package', 'duration': 800},
+      {'icon': '✨', 'text': 'Finalizing installation', 'duration': 600},
+    ];
+    
+    for (int i = 0; i < steps.length; i++) {
+      final step = steps[i];
+      final progress = ((i + 1) / steps.length * 100).round();
+      
+      // Show step header
+      print('${brightCyan}${bold}Step ${i + 1}/${steps.length}:${reset} ${brightYellow}${step['icon']} ${step['text']}${reset}');
+      
+      // Show progress bar with spinner
+      stdout.write('${dim}   ${_getSpinner(0)} [${_getProgressBar(0)}] 0%${reset}');
+      
+      // Animate progress bar with spinning
+      for (int p = 0; p <= 100; p += 5) {
+        await Future.delayed(Duration(milliseconds: (step['duration'] as int) ~/ 20));
+        stdout.write('\r${dim}   ${_getSpinner(p ~/ 5)} [${_getProgressBar(p)}] ${p.toString().padLeft(3)}%${reset}');
+      }
+      
+      // Show completion
+      print(' ${brightGreen}✅${reset}');
+      print('');
+    }
+    
+    print('${brightGreen}${bold}🎉 All steps completed successfully!${reset}');
+    print('');
+  }
+  
+  Future<void> _showCompletionCelebration() async {
+    const String reset = '\x1B[0m';
+    const String bold = '\x1B[1m';
+    const String brightGreen = '\x1B[92m';
+    const String brightYellow = '\x1B[93m';
+    const String brightCyan = '\x1B[96m';
+    const String brightMagenta = '\x1B[95m';
+    
+    final celebrations = [
+      '🎉', '✨', '🚀', '🎊', '💫', '🌟', '🎈', '🎯', '🏆', '💎'
+    ];
+    
+    print('');
+    print('${brightMagenta}${bold}╔══════════════════════════════════════════════════════════════╗${reset}');
+    print('${brightMagenta}${bold}║${reset}${brightYellow}${bold}                    🎊 UPDATE COMPLETE! 🎊                    ${reset}${brightMagenta}${bold}║${reset}');
+    print('${brightMagenta}${bold}╚══════════════════════════════════════════════════════════════╝${reset}');
+    print('');
+    
+    // Animated celebration
+    for (int i = 0; i < 3; i++) {
+      for (int j = 0; j < celebrations.length; j++) {
+        stdout.write('\r${brightCyan}${bold}${celebrations[j]}${reset} ');
+        await Future.delayed(Duration(milliseconds: 100));
+      }
+    }
+    print('');
+    print('');
+  }
+  
+  String _getProgressBar(int percentage) {
+    const int barLength = 20;
+    final filledLength = (percentage / 100 * barLength).round();
+    final emptyLength = barLength - filledLength;
+    
+    final filled = '█' * filledLength;
+    final empty = '░' * emptyLength;
+    
+    return filled + empty;
+  }
+  
+  String _getSpinner(int step) {
+    final spinners = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+    return spinners[step % spinners.length];
+  }
+
   Future<void> _checkForUpdates() async {
     try {
       final isUpdateAvailable = await VersionChecker.isUpdateAvailable(_version);
@@ -143,8 +233,10 @@ class FlutterForgeCLI {
     
     try {
       print('${brightYellow}${bold}🔄 Updating FlutterForge CLI...${reset}');
-      print('${dim}This may take a few moments...${reset}');
       print('');
+      
+      // Show progress steps
+      await _showUpdateProgress();
       
       // Execute the update command
       final result = Process.runSync('dart', [
@@ -157,6 +249,8 @@ class FlutterForgeCLI {
       ]);
       
       if (result.exitCode == 0) {
+        await _showCompletionCelebration();
+        print('');
         print('${brightGreen}${bold}✅ FlutterForge CLI updated successfully!${reset}');
         print('');
         print('${brightCyan}${bold}🎉 What\'s new:${reset}');
