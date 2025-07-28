@@ -34,7 +34,7 @@ class CliController {
     
     final projectName = _getProjectName();
     final organization = _getOrganization();
-    _getPlatforms();
+    final platforms = _getPlatforms();
     final stateManagement = _getStateManagement();
     final includeGoRouter = _getGoRouterChoice();
     final includeCleanArchitecture = _getCleanArchitectureChoice();
@@ -44,6 +44,7 @@ class CliController {
     final config = ProjectConfig(
       projectName: projectName,
       organizationName: organization,
+      platforms: platforms,
       stateManagement: stateManagement,
       includeGoRouter: includeGoRouter,
       includeCleanArchitecture: includeCleanArchitecture,
@@ -125,49 +126,105 @@ class CliController {
     }
   }
 
-  List<String> _getPlatforms() {
+  List<PlatformType> _getPlatforms() {
     print('');
     print('${_brightYellow}${_bold}🌍 Platform Selection${_reset}');
     print('${_yellow}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${_reset}');
     print('');
     
-    final platforms = <String>[];
-    
-    // Mobile platforms
-    print('${_brightCyan}${_bold}📱 Mobile Platforms:${_reset}');
-    if (_getYesNoChoice('   Include Android?', defaultYes: true)) {
-      platforms.add('android');
-    }
-    if (_getYesNoChoice('   Include iOS?', defaultYes: true)) {
-      platforms.add('ios');
-    }
-    
-    // Web platform
+    print('${_brightCyan}${_bold}Choose your platform configuration:${_reset}');
+    print('${_dim}1.${_reset} ${_brightGreen}Mobile Only${_reset} ${_dim}- Android & iOS (Default)${_reset}');
+    print('${_dim}2.${_reset} ${_brightGreen}Web Only${_reset} ${_dim}- Web browser${_reset}');
+    print('${_dim}3.${_reset} ${_brightGreen}Desktop Only${_reset} ${_dim}- Windows, macOS, Linux${_reset}');
+    print('${_dim}4.${_reset} ${_brightGreen}Mobile + Web${_reset} ${_dim}- Android, iOS, Web${_reset}');
+    print('${_dim}5.${_reset} ${_brightGreen}Mobile + Desktop${_reset} ${_dim}- Android, iOS, Windows, macOS, Linux${_reset}');
+    print('${_dim}6.${_reset} ${_brightGreen}Web + Desktop${_reset} ${_dim}- Web, Windows, macOS, Linux${_reset}');
+    print('${_dim}7.${_reset} ${_brightGreen}All Platforms${_reset} ${_dim}- Android, iOS, Web, Windows, macOS, Linux${_reset}');
+    print('${_dim}8.${_reset} ${_brightGreen}Custom Selection${_reset} ${_dim}- Choose platforms individually${_reset}');
     print('');
-    print('${_brightCyan}${_bold}🌐 Web Platform:${_reset}');
-    if (_getYesNoChoice('   Include Web?', defaultYes: false)) {
-      platforms.add('web');
-    }
     
-    // Desktop platforms
+    while (true) {
+      stdout.write('${_brightGreen}${_bold}🌍 Your choice (1-8):${_reset} ');
+      final choice = stdin.readLineSync()?.trim() ?? '';
+      
+      switch (choice) {
+        case '1':
+          return [PlatformType.mobile];
+        case '2':
+          return [PlatformType.web];
+        case '3':
+          return [PlatformType.desktop];
+        case '4':
+          return [PlatformType.mobile, PlatformType.web];
+        case '5':
+          return [PlatformType.mobile, PlatformType.desktop];
+        case '6':
+          return [PlatformType.web, PlatformType.desktop];
+        case '7':
+          return [PlatformType.mobile, PlatformType.web, PlatformType.desktop];
+        case '8':
+          return _getCustomPlatformSelection();
+        default:
+          print('${_brightRed}❌ Invalid choice. Please enter 1-8.${_reset}');
+      }
+    }
+  }
+
+  List<PlatformType> _getCustomPlatformSelection() {
     print('');
-    print('${_brightCyan}${_bold}💻 Desktop Platforms:${_reset}');
-    if (_getYesNoChoice('   Include Windows?', defaultYes: false)) {
-      platforms.add('windows');
-    }
-    if (_getYesNoChoice('   Include macOS?', defaultYes: false)) {
-      platforms.add('macos');
-    }
-    if (_getYesNoChoice('   Include Linux?', defaultYes: false)) {
-      platforms.add('linux');
-    }
+    print('${_brightCyan}${_bold}🔧 Custom Platform Selection${_reset}');
+    print('${_dim}Select platforms individually (y/n for each):${_reset}');
+    print('');
     
-    if (platforms.isEmpty) {
-      print('${_brightYellow}⚠️  No platforms selected. Defaulting to Android and iOS.${_reset}');
-      platforms.addAll(['android', 'ios']);
-    }
+    final platforms = <PlatformType>[];
     
-    return platforms;
+    // Quick selection options
+    print('${_brightYellow}${_bold}⚡ Quick Options:${_reset}');
+    print('${_dim}• Type "mobile" to select Android + iOS${_reset}');
+    print('${_dim}• Type "desktop" to select Windows + macOS + Linux${_reset}');
+    print('${_dim}• Type "all" to select all platforms${_reset}');
+    print('${_dim}• Type "none" to skip all platforms${_reset}');
+    print('');
+    
+    stdout.write('${_brightGreen}${_bold}⚡ Quick selection (or press Enter for individual):${_reset} ');
+    final quickChoice = stdin.readLineSync()?.trim().toLowerCase() ?? '';
+    
+    switch (quickChoice) {
+      case 'mobile':
+        return [PlatformType.mobile];
+      case 'desktop':
+        return [PlatformType.desktop];
+      case 'all':
+        return [PlatformType.mobile, PlatformType.web, PlatformType.desktop];
+      case 'none':
+        return [];
+      default:
+        // Individual selection
+        print('');
+        print('${_brightCyan}${_bold}📱 Mobile Platforms:${_reset}');
+        if (_getYesNoChoice('   Include Android?', defaultYes: true)) {
+          platforms.add(PlatformType.mobile);
+        }
+        
+        print('');
+        print('${_brightCyan}${_bold}🌐 Web Platform:${_reset}');
+        if (_getYesNoChoice('   Include Web?', defaultYes: false)) {
+          platforms.add(PlatformType.web);
+        }
+        
+        print('');
+        print('${_brightCyan}${_bold}💻 Desktop Platforms:${_reset}');
+        if (_getYesNoChoice('   Include Windows?', defaultYes: false)) {
+          platforms.add(PlatformType.desktop);
+        }
+        
+        if (platforms.isEmpty) {
+          print('${_brightYellow}⚠️  No platforms selected. Defaulting to Mobile (Android & iOS).${_reset}');
+          platforms.add(PlatformType.mobile);
+        }
+        
+        return platforms;
+    }
   }
 
   StateManagementType _getStateManagement() {

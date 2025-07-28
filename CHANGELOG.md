@@ -12,7 +12,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GitHub Actions workflow for automated releases
 - CHANGELOG.md for tracking version history
 
-## [1.1.0] - 2024-12-27
+## [1.10.0] - 2025-07-28
+
+### Added
+- 🎯 **Improved Platform Selection Flow** - No more tedious individual platform questions!
+- ⚡ **Quick Selection Options** - Choose from preset configurations or use quick commands
+- 🚀 **Better User Experience** - Streamlined platform selection with 8 preset options
+- 🎨 **Enhanced CLI Interface** - More intuitive and user-friendly platform selection
+
+### Changed
+- 🔄 **Platform Selection Redesign** - Replaced individual platform questions with smart preset options
+- 📱 **Mobile Platform Handling** - Android and iOS are now grouped as "Mobile" platform
+- 💻 **Desktop Platform Handling** - Windows, macOS, and Linux are now grouped as "Desktop" platform
+- 🌐 **Web Platform** - Standalone web platform option
+- ⚡ **Quick Commands** - Added "mobile", "desktop", "all", "none" quick selection commands
+
+### Features
+- **8 Preset Options**: Mobile Only, Web Only, Desktop Only, Mobile + Web, Mobile + Desktop, Web + Desktop, All Platforms, Custom Selection
+- **Quick Commands**: Type "mobile", "desktop", "all", or "none" for instant selection
+- **Fallback to Individual**: Still available for users who want granular control
+- **Smart Defaults**: Defaults to Mobile (Android & iOS) if no selection is made
+
+## [1.1.0] - 2025-07-28
 
 ### Added
 - ✨ Beautiful animated progress bar for CLI updates
