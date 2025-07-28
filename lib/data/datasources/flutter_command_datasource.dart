@@ -104,27 +104,46 @@ class FlutterCommandDataSourceImpl implements FlutterCommandDataSource {
   @override
   Future<void> generateLocalizationFiles(String projectName) async {
     try {
-      // Run flutter gen-l10n to generate localization files
+      // Always run intl_utils:generate directly since it's more reliable
       final result = await Process.run(
-        'flutter',
-        ['gen-l10n'],
+        'dart',
+        ['run', 'intl_utils:generate'],
         workingDirectory: projectName,
       );
 
       if (result.exitCode != 0) {
-        // If flutter gen-l10n fails, try dart run intl_utils:generate as fallback
-        final fallbackResult = await Process.run(
-          'dart',
-          ['run', 'intl_utils:generate'],
-          workingDirectory: projectName,
-        );
-
-        if (fallbackResult.exitCode != 0) {
-          print('Warning: Failed to generate localization files. You may need to run "dart run intl_utils:generate" manually.');
-        }
+        print('Warning: Failed to generate localization files. You may need to run "dart run intl_utils:generate" manually.');
       }
+
+      // Always fix the import in app_localizations.dart after generation
+      await _fixAppLocalizationsImport(projectName);
     } catch (e) {
       print('Warning: Failed to generate localization files: $e');
+    }
+  }
+
+  Future<void> _fixAppLocalizationsImport(String projectName) async {
+    try {
+      final appLocalizationsFile = File('$projectName/lib/application/generated/l10n/app_localizations.dart');
+      if (appLocalizationsFile.existsSync()) {
+        String content = appLocalizationsFile.readAsStringSync();
+        print('Fixing app_localizations.dart import...');
+        print('Original content contains flutter_gen import: ${content.contains("package:flutter_gen/gen_l10n/app_localizations.dart")}');
+        
+        // Replace the wrong import with the correct one
+        content = content.replaceFirst(
+          "import 'package:flutter_gen/gen_l10n/app_localizations.dart';",
+          "import '../l10n.dart';"
+        );
+        
+        print('After replacement contains correct import: ${content.contains("../l10n.dart")}');
+        appLocalizationsFile.writeAsStringSync(content);
+        print('Import fix completed successfully!');
+      } else {
+        print('Warning: app_localizations.dart file not found at expected location');
+      }
+    } catch (e) {
+      print('Warning: Failed to fix app_localizations.dart import: $e');
     }
   }
 
