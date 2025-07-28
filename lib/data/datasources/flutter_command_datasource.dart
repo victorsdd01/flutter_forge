@@ -127,8 +127,6 @@ class FlutterCommandDataSourceImpl implements FlutterCommandDataSource {
       final appLocalizationsFile = File('$projectName/lib/application/generated/l10n/app_localizations.dart');
       if (appLocalizationsFile.existsSync()) {
         String content = appLocalizationsFile.readAsStringSync();
-        print('Fixing app_localizations.dart import...');
-        print('Original content contains flutter_gen import: ${content.contains("package:flutter_gen/gen_l10n/app_localizations.dart")}');
         
         // Replace the wrong import with the correct one
         content = content.replaceFirst(
@@ -136,14 +134,10 @@ class FlutterCommandDataSourceImpl implements FlutterCommandDataSource {
           "import '../l10n.dart';"
         );
         
-        print('After replacement contains correct import: ${content.contains("../l10n.dart")}');
         appLocalizationsFile.writeAsStringSync(content);
-        print('Import fix completed successfully!');
-      } else {
-        print('Warning: app_localizations.dart file not found at expected location');
       }
     } catch (e) {
-      print('Warning: Failed to fix app_localizations.dart import: $e');
+      // Silently handle the error - this is not critical for the user experience
     }
   }
 

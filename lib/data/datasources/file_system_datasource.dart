@@ -515,8 +515,14 @@ class CounterProvider with ChangeNotifier {
       return _generateFreezedBlocWithGoRouterAndCleanArchitecture();
     } else if (stateManagement == StateManagementType.bloc && includeFreezed && includeCleanArchitecture) {
       return _generateFreezedBlocWithCleanArchitecture();
+    } else if (stateManagement == StateManagementType.bloc && includeFreezed && includeGoRouter) {
+      return _generateFreezedBlocWithGoRouter();
     } else if (stateManagement == StateManagementType.bloc && includeFreezed) {
       return _generateBlocMainContent(includeFreezed);
+    } else if (stateManagement == StateManagementType.bloc && includeGoRouter) {
+      return _generateBlocWithGoRouter(includeFreezed);
+    } else if (stateManagement == StateManagementType.cubit && includeGoRouter) {
+      return _generateCubitWithGoRouter();
     } else {
       // Fallback to the original approach for other combinations
       String baseContent;
@@ -919,7 +925,7 @@ Future<void> runMainApp() async {
   Injector.init();
 
   runApp(MultiBlocProvider(
-      providers: [
+      providers: <SingleChildWidget>[
         BlocProvider<SampleBloc>(
           create: (BuildContext _) => Injector.get<SampleBloc>(),
         ),
@@ -968,19 +974,26 @@ import 'presentation/pages/home_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // Initialize dependency injection
+  await runMainApp();
+}
+
+Future<void> runMainApp() async {
+  HydratedBloc.storage = await HydratedStorage.build(
+    storageDirectory: kIsWeb
+        ? HydratedStorageDirectory.web
+        : HydratedStorageDirectory((await getTemporaryDirectory()).path),
+  );
   Injector.init();
-  
-  // Initialize HydratedBloc storage
-  if (!kIsWeb) {
-    final storage = await HydratedStorage.build(
-      storageDirectory: HydratedStorageDirectory((await getTemporaryDirectory()).path),
-    );
-    HydratedBloc.storage = storage;
-  }
-  
-  runApp(const MyApp());
+
+  runApp(MultiBlocProvider(
+      providers: <SingleChildWidget>[
+        BlocProvider<SampleBloc>(
+          create: (BuildContext _) => Injector.get<SampleBloc>(),
+        ),
+      ],
+      child: const MyApp()
+    )
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -994,16 +1007,191 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: MultiBlocProvider(
-        providers: [
-          BlocProvider<SampleBloc>(
-            create: (context) => Injector.get<SampleBloc>(),
-          ),
-        ],
-        child: const HomePage(),
-      ),
+      home: const HomePage(),
     );
   }
+}
+''';
+  }
+
+  String _generateFreezedBlocWithGoRouter() {
+    return '''
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:hydrated_bloc/hydrated_bloc.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:flutter/foundation.dart';
+import 'core/di/dependency_injection.dart';
+import 'presentation/blocs/sample_bloc.dart';
+import 'routes/app_router.dart';
+import 'application/generated/l10n/app_localizations.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await runMainApp();
+}
+
+Future<void> runMainApp() async {
+  HydratedBloc.storage = await HydratedStorage.build(
+    storageDirectory: kIsWeb
+        ? HydratedStorageDirectory.web
+        : HydratedStorageDirectory((await getTemporaryDirectory()).path),
+  );
+  Injector.init();
+
+  runApp(MultiBlocProvider(
+      providers: <SingleChildWidget>[
+        BlocProvider<SampleBloc>(
+          create: (BuildContext _) => Injector.get<SampleBloc>(),
+        ),
+      ],
+      child: const MyApp()
+    )
+  );
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) => MaterialApp.router(
+    theme: ThemeData(
+      colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+      useMaterial3: true,
+    ),
+    routerConfig: AppRouter.router,
+    localizationsDelegates: AppLocalizationsSetup.localizationsDelegates,
+    supportedLocales: AppLocalizationsSetup.supportedLocales,
+    debugShowCheckedModeBanner: kDebugMode,
+    themeAnimationCurve: Curves.easeInOut,
+    themeAnimationDuration: const Duration(milliseconds: 300),
+    themeAnimationStyle: AnimationStyle(
+      curve: Curves.easeInOut,
+      duration: const Duration(milliseconds: 300),
+      reverseCurve: Curves.easeInOut,
+      reverseDuration: const Duration(milliseconds: 300),
+    ),
+  );
+}
+''';
+  }
+
+  String _generateBlocWithGoRouter(bool includeFreezed) {
+    return '''
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:hydrated_bloc/hydrated_bloc.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:flutter/foundation.dart';
+import 'presentation/blocs/counter_bloc.dart';
+import 'routes/app_router.dart';
+import 'application/generated/l10n/app_localizations.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await runMainApp();
+}
+
+Future<void> runMainApp() async {
+  HydratedBloc.storage = await HydratedStorage.build(
+    storageDirectory: kIsWeb
+        ? HydratedStorageDirectory.web
+        : HydratedStorageDirectory((await getTemporaryDirectory()).path),
+  );
+
+  runApp(MultiBlocProvider(
+      providers: <SingleChildWidget>[
+        BlocProvider<CounterBloc>(
+          create: (BuildContext _) => CounterBloc(),
+        ),
+      ],
+      child: const MyApp()
+    )
+  );
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) => MaterialApp.router(
+    theme: ThemeData(
+      colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+      useMaterial3: true,
+    ),
+    routerConfig: AppRouter.router,
+    localizationsDelegates: AppLocalizationsSetup.localizationsDelegates,
+    supportedLocales: AppLocalizationsSetup.supportedLocales,
+    debugShowCheckedModeBanner: kDebugMode,
+    themeAnimationCurve: Curves.easeInOut,
+    themeAnimationDuration: const Duration(milliseconds: 300),
+    themeAnimationStyle: AnimationStyle(
+      curve: Curves.easeInOut,
+      duration: const Duration(milliseconds: 300),
+      reverseCurve: Curves.easeInOut,
+      reverseDuration: const Duration(milliseconds: 300),
+    ),
+  );
+}
+''';
+  }
+
+  String _generateCubitWithGoRouter() {
+    return '''
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:hydrated_bloc/hydrated_bloc.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:flutter/foundation.dart';
+import 'presentation/cubits/counter_cubit.dart';
+import 'presentation/cubits/counter_state.dart';
+import 'routes/app_router.dart';
+import 'application/generated/l10n/app_localizations.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await runMainApp();
+}
+
+Future<void> runMainApp() async {
+  HydratedBloc.storage = await HydratedStorage.build(
+    storageDirectory: kIsWeb
+        ? HydratedStorageDirectory.web
+        : HydratedStorageDirectory((await getTemporaryDirectory()).path),
+  );
+
+  runApp(MultiBlocProvider(
+    providers: <SingleChildWidget>[
+      BlocProvider<CounterCubit>(
+        create: (BuildContext _) => CounterCubit(),
+      ),
+    ],
+    child: const MyApp(),
+  ));
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) => MaterialApp.router(
+    theme: ThemeData(
+      colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+      useMaterial3: true,
+    ),
+    routerConfig: AppRouter.router,
+    localizationsDelegates: AppLocalizationsSetup.localizationsDelegates,
+    supportedLocales: AppLocalizationsSetup.supportedLocales,
+    debugShowCheckedModeBanner: kDebugMode,
+    themeAnimationCurve: Curves.easeInOut,
+    themeAnimationDuration: const Duration(milliseconds: 300),
+    themeAnimationStyle: AnimationStyle(
+      curve: Curves.easeInOut,
+      duration: const Duration(milliseconds: 300),
+      reverseCurve: Curves.easeInOut,
+      reverseDuration: const Duration(milliseconds: 300),
+    ),
+  );
 }
 ''';
   }
@@ -1022,19 +1210,26 @@ import 'presentation/pages/home_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // Initialize dependency injection
+  await runMainApp();
+}
+
+Future<void> runMainApp() async {
+  HydratedBloc.storage = await HydratedStorage.build(
+    storageDirectory: kIsWeb
+        ? HydratedStorageDirectory.web
+        : HydratedStorageDirectory((await getTemporaryDirectory()).path),
+  );
   Injector.init();
-  
-  // Initialize HydratedBloc storage
-  if (!kIsWeb) {
-    final storage = await HydratedStorage.build(
-      storageDirectory: HydratedStorageDirectory((await getTemporaryDirectory()).path),
-    );
-    HydratedBloc.storage = storage;
-  }
-  
-  runApp(const MyApp());
+
+  runApp(MultiBlocProvider(
+      providers: [
+        BlocProvider<SampleBloc>(
+          create: (BuildContext _) => Injector.get<SampleBloc>(),
+        ),
+      ],
+      child: const MyApp()
+    )
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -1048,14 +1243,7 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: MultiBlocProvider(
-        providers: [
-          BlocProvider<SampleBloc>(
-            create: (context) => Injector.get<SampleBloc>(),
-          ),
-        ],
-        child: const HomePage(),
-      ),
+      home: const HomePage(),
     );
   }
 }
@@ -1071,16 +1259,25 @@ import 'presentation/blocs/counter_bloc.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // Initialize HydratedBloc storage
-  if (!kIsWeb) {
-    final storage = await HydratedStorage.build(
-      storageDirectory: HydratedStorageDirectory((await getTemporaryDirectory()).path),
-    );
-    HydratedBloc.storage = storage;
-  }
-  
-  runApp(MyApp());
+  await runMainApp();
+}
+
+Future<void> runMainApp() async {
+  HydratedBloc.storage = await HydratedStorage.build(
+    storageDirectory: kIsWeb
+        ? HydratedStorageDirectory.web
+        : HydratedStorageDirectory((await getTemporaryDirectory()).path),
+  );
+
+  runApp(MultiBlocProvider(
+      providers: [
+        BlocProvider<CounterBloc>(
+          create: (BuildContext _) => CounterBloc(),
+        ),
+      ],
+      child: const MyApp()
+    )
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -1093,14 +1290,7 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: MultiBlocProvider(
-        providers: [
-          BlocProvider<CounterBloc>(
-            create: (BuildContext _) => CounterBloc(),
-          ),
-        ],
-        child: const MyHomePage(title: 'Flutter Demo Home Page'),
-      ),
+      home: const MyHomePage(title: 'Flutter Demo Home Page'),
     );
   }
 }

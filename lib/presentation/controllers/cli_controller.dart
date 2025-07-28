@@ -243,14 +243,28 @@ class CliController {
 
   bool _getYesNoChoice(String question, {bool defaultYes = false}) {
     final defaultText = defaultYes ? 'Y/n' : 'y/N';
-    stdout.write('${_brightGreen}${_bold}$question${_reset} ${_dim}($defaultText)${_reset} ');
-    final response = stdin.readLineSync()?.trim().toLowerCase() ?? '';
     
-    if (response.isEmpty) {
-      return defaultYes;
+    while (true) {
+      stdout.write('${_brightGreen}${_bold}$question${_reset} ${_dim}($defaultText)${_reset} ');
+      final response = stdin.readLineSync()?.trim().toLowerCase() ?? '';
+      
+      if (response.isEmpty) {
+        // Don't accept empty input - require explicit answer
+        print('${_brightRed}❌ Please enter y/yes or n/no.${_reset}');
+        continue;
+      }
+      
+      if (response == 'y' || response == 'yes') {
+        return true;
+      }
+      
+      if (response == 'n' || response == 'no') {
+        return false;
+      }
+      
+      // Invalid input - ask again
+      print('${_brightRed}❌ Invalid answer. Please enter y/yes or n/no.${_reset}');
     }
-    
-    return response == 'y' || response == 'yes';
   }
 
   void _printConfigurationSummary(ProjectConfig config) {
