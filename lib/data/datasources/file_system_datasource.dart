@@ -151,22 +151,24 @@ class FileSystemDataSourceImpl implements FileSystemDataSource {
       }
     }
 
-    // Add localization configuration if not present
-    if (!pubspecContent.contains('arb-dir:')) {
-      final localizationConfig = '''
-# Localization configuration
-arb-dir: lib/application/l10n
-template-arb-file: intl_en.arb
-output-localization-file: app_localizations.dart
+    // Add or update flutter_intl configuration at root level
+    if (!pubspecContent.contains('flutter_intl:')) {
+      final flutterIntlConfig = '''
+flutter_intl:
+  enabled: true
+  arb_dir: lib/application/l10n
+  output_dir: lib/application/generated
 ''';
       
-      // Add localization configuration before the flutter section
-      final flutterSectionIndex = pubspecContent.indexOf('# The following section is specific to Flutter packages.');
-      if (flutterSectionIndex != -1) {
-        pubspecContent = '${pubspecContent.substring(0, flutterSectionIndex)}$localizationConfig\n${pubspecContent.substring(flutterSectionIndex)}';
+      // Add flutter_intl configuration at the end of the file, before the last line
+      final lastLineIndex = pubspecContent.lastIndexOf('\n');
+      if (lastLineIndex != -1) {
+        final beforeLastLine = pubspecContent.substring(0, lastLineIndex);
+        final lastLine = pubspecContent.substring(lastLineIndex);
+        pubspecContent = '$beforeLastLine\n$flutterIntlConfig$lastLine';
       } else {
         // Fallback: add at the end
-        pubspecContent = '$pubspecContent\n$localizationConfig';
+        pubspecContent = '$pubspecContent\n$flutterIntlConfig';
       }
     }
     
@@ -973,15 +975,12 @@ Future<void> main() async {
   // Initialize HydratedBloc storage
   if (!kIsWeb) {
     final storage = await HydratedStorage.build(
-      storageDirectory: await getTemporaryDirectory(),
+      storageDirectory: HydratedStorageDirectory((await getTemporaryDirectory()).path),
     );
-    HydratedBlocOverrides.runZoned(
-      () => runApp(const MyApp()),
-      storage: storage,
-    );
-  } else {
-    runApp(const MyApp());
+    HydratedBloc.storage = storage;
   }
+  
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
@@ -1030,15 +1029,12 @@ Future<void> main() async {
   // Initialize HydratedBloc storage
   if (!kIsWeb) {
     final storage = await HydratedStorage.build(
-      storageDirectory: await getTemporaryDirectory(),
+      storageDirectory: HydratedStorageDirectory((await getTemporaryDirectory()).path),
     );
-    HydratedBlocOverrides.runZoned(
-      () => runApp(const MyApp()),
-      storage: storage,
-    );
-  } else {
-    runApp(const MyApp());
+    HydratedBloc.storage = storage;
   }
+  
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
@@ -1079,15 +1075,12 @@ Future<void> main() async {
   // Initialize HydratedBloc storage
   if (!kIsWeb) {
     final storage = await HydratedStorage.build(
-      storageDirectory: await getTemporaryDirectory(),
+      storageDirectory: HydratedStorageDirectory((await getTemporaryDirectory()).path),
     );
-    HydratedBlocOverrides.runZoned(
-      () => runApp(MyApp()),
-      storage: storage,
-    );
-  } else {
-    runApp(MyApp());
+    HydratedBloc.storage = storage;
   }
+  
+  runApp(MyApp());
 }
 
 class MyApp extends StatelessWidget {
@@ -2486,13 +2479,13 @@ export 'providers/counter_provider.dart';
       generatedDir.createSync(recursive: true);
     }
 
-    // Create l10n subdirectory in generated
+    // Create l10n subdirectory in generated (intl_utils expects this)
     final generatedL10nDir = Directory(path.join(projectName, 'lib/application/generated/l10n'));
     if (!generatedL10nDir.existsSync()) {
       generatedL10nDir.createSync(recursive: true);
     }
 
-    // Create app_localizations.dart file
+    // Create app_localizations.dart file with correct import
     final appLocalizationsFile = File(path.join(projectName, 'lib/application/generated/l10n/app_localizations.dart'));
     appLocalizationsFile.writeAsStringSync(_generateAppLocalizationsContent());
 
