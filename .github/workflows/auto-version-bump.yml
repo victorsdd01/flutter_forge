@@ -184,47 +184,101 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
 
+      - name: Ensure we're on main and up to date
+        run: |
+          git checkout main
+          git pull origin main
+
       - name: Create version bump branch and commit
         id: version_bump
         run: |
           VERSION="${{ steps.get_version.outputs.version }}"
           BRANCH_NAME="chore/bump-version-$VERSION"
           
-          # Create and checkout new branch
+          # Ensure we're on main
+          git checkout main
+          
+          # Create and checkout new branch from main
           git checkout -b "$BRANCH_NAME"
+          
+          # Verify files exist and show current state
+          echo "Current pubspec.yaml version:"
+          grep "version:" pubspec.yaml || echo "pubspec.yaml not found"
+          echo ""
+          echo "Current CHANGELOG.md (first 20 lines):"
+          head -n 20 CHANGELOG.md || echo "CHANGELOG.md not found"
           
           # Stage changes
           git add pubspec.yaml CHANGELOG.md
           
+          # Show what will be committed
+          echo ""
+          echo "Files staged for commit:"
+          git status --short
+          
           # Commit changes
           git commit -m "chore: bump version to $VERSION [skip ci]"
+          
+          # Show commit details
+          echo ""
+          echo "Commit created:"
+          git log -1 --stat
           
           # Push branch
           git push origin "$BRANCH_NAME"
           
+          # Verify branch has differences from main
+          echo ""
+          echo "Checking differences with main:"
+          git diff main..HEAD --stat || echo "No differences found"
+          
+          # Count commits ahead of main
+          COMMITS_AHEAD=$(git rev-list --count main..HEAD)
+          echo "Commits ahead of main: $COMMITS_AHEAD"
+          
+          if [ "$COMMITS_AHEAD" -eq 0 ]; then
+            echo "⚠️ Warning: Branch has no commits ahead of main"
+          fi
+          
           echo "branch=$BRANCH_NAME" >> $GITHUB_OUTPUT
 
       - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v5
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          branch: ${{ steps.version_bump.outputs.branch }}
-          base: main
-          title: "chore: bump version to ${{ steps.get_version.outputs.version }} [skip ci]"
-          body: |
-            This PR was automatically created to bump the version after ${{ github.event_name == 'pull_request' && format('merging PR #{0}', github.event.pull_request.number) || 'a push to main' }}.
-            
-            **Changes:**
-            - Updated `pubspec.yaml` version to `${{ steps.get_version.outputs.version }}`
-            - Updated `CHANGELOG.md` with new release entry
-            
-            This PR will be auto-merged if branch protection allows.
-          labels: |
-            automated
-            chore
-          delete-branch: true
-          commit-message: "chore: bump version to ${{ steps.get_version.outputs.version }} [skip ci]"
         id: create_pr
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          BRANCH_NAME="${{ steps.version_bump.outputs.branch }}"
+          
+          # Create PR using GitHub CLI
+          PR_BODY=$(cat <<EOF
+          This PR was automatically created to bump the version after ${{ github.event_name == 'pull_request' && format('merging PR #{0}', github.event.pull_request.number) || 'a push to main' }}.
+          
+          **Changes:**
+          - Updated \`pubspec.yaml\` version to \`$VERSION\`
+          - Updated \`CHANGELOG.md\` with new release entry
+          
+          This PR will be auto-merged if branch protection allows.
+          EOF
+          )
+          
+          PR_RESPONSE=$(gh pr create \
+            --title "chore: bump version to $VERSION [skip ci]" \
+            --body "$PR_BODY" \
+            --base main \
+            --head "$BRANCH_NAME" \
+            --label "automated,chore" \
+            --json number,url,state || echo "")
+          
+          if [ -n "$PR_RESPONSE" ]; then
+            PR_NUMBER=$(echo "$PR_RESPONSE" | jq -r '.number')
+            PR_URL=$(echo "$PR_RESPONSE" | jq -r '.url')
+            echo "✅ Created PR #$PR_NUMBER: $PR_URL"
+            echo "pull-request-number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          else
+            echo "⚠️ Failed to create PR or PR already exists"
+            echo "pull-request-number=" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Auto-merge PR (if possible)
         if: steps.create_pr.outputs.pull-request-number != ''
