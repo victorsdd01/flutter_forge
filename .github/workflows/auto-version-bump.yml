@@ -267,21 +267,30 @@ jobs:
           EOF
           )
           
-          PR_RESPONSE=$(gh pr create \
+          # Create PR and capture output
+          PR_OUTPUT=$(gh pr create \
             --title "chore: bump version to $VERSION [skip ci]" \
             --body "$PR_BODY" \
             --base main \
             --head "$BRANCH_NAME" \
-            --label "automated,chore" \
-            --json number,url,state || echo "")
+            --label "automated,chore" 2>&1) || PR_EXIT_CODE=$?
           
-          if [ -n "$PR_RESPONSE" ]; then
-            PR_NUMBER=$(echo "$PR_RESPONSE" | jq -r '.number')
-            PR_URL=$(echo "$PR_RESPONSE" | jq -r '.url')
-            echo "✅ Created PR #$PR_NUMBER: $PR_URL"
-            echo "pull-request-number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          if [ -z "$PR_EXIT_CODE" ] && [ -n "$PR_OUTPUT" ]; then
+            # Extract PR number from output (format: "https://github.com/owner/repo/pull/123")
+            PR_NUMBER=$(echo "$PR_OUTPUT" | grep -oP 'pull/\K[0-9]+' | head -1)
+            PR_URL=$(echo "$PR_OUTPUT" | grep -oP 'https://[^\s]+' | head -1)
+            
+            if [ -n "$PR_NUMBER" ]; then
+              echo "✅ Created PR #$PR_NUMBER: $PR_URL"
+              echo "pull-request-number=$PR_NUMBER" >> $GITHUB_OUTPUT
+            else
+              echo "⚠️ PR created but could not extract PR number from output:"
+              echo "$PR_OUTPUT"
+              echo "pull-request-number=" >> $GITHUB_OUTPUT
+            fi
           else
-            echo "⚠️ Failed to create PR or PR already exists"
+            echo "⚠️ Failed to create PR. Output:"
+            echo "$PR_OUTPUT"
             echo "pull-request-number=" >> $GITHUB_OUTPUT
           fi
         env:
