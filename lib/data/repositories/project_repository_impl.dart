@@ -47,16 +47,6 @@ class ProjectRepositoryImpl implements ProjectRepository {
       true
     );
 
-    await _fileSystemDataSource.createGoRouterTemplates(config.projectName);
-
-    await _fileSystemDataSource.updateMainFile(
-      config.projectName, 
-      StateManagementType.bloc, 
-      true,
-      true,
-      true
-    );
-
     if (config.includeLinterRules) {
       await _fileSystemDataSource.createLinterRules(config.projectName);
     }
@@ -75,6 +65,8 @@ class ProjectRepositoryImpl implements ProjectRepository {
       true,
       true
     );
+
+    await _flutterCommandDataSource.runBuildRunner(config.projectName);
   }
 
   @override

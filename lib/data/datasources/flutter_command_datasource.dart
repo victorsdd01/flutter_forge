@@ -17,6 +17,8 @@ abstract class FlutterCommandDataSource {
   Future<void> generateLocalizationFiles(String projectName);
   
   Future<void> cleanBuildCache(String projectName);
+  
+  Future<void> runBuildRunner(String projectName);
 }
 
 /// Implementation of FlutterCommandDataSource
@@ -161,6 +163,37 @@ class FlutterCommandDataSourceImpl implements FlutterCommandDataSource {
       }
     } catch (e) {
       print('Warning: Failed to clean build cache: $e');
+    }
+  }
+
+  @override
+  Future<void> runBuildRunner(String projectName) async {
+    const String reset = '\x1B[0m';
+    const String bold = '\x1B[1m';
+    const String brightCyan = '\x1B[96m';
+    const String dim = '\x1B[2m';
+    
+    try {
+      print('');
+      print('${brightCyan}${bold}⏳ Please wait, we are setting up your project...${reset}');
+      print('${dim}   This may take a few moments${reset}');
+      print('');
+      
+      final result = await Process.run(
+        'dart',
+        ['run', 'build_runner', 'build', '-d'],
+        workingDirectory: projectName,
+      );
+
+      if (result.exitCode == 0) {
+        // Success message will be shown in cli_controller after this completes
+      } else {
+        print('\n⚠️  Warning: build_runner completed with errors.');
+        print('   You may need to run "dart run build_runner build -d" manually.\n');
+      }
+    } catch (e) {
+      print('\n⚠️  Warning: Failed to run build_runner: $e');
+      print('   You may need to run "dart run build_runner build -d" manually.\n');
     }
   }
 }

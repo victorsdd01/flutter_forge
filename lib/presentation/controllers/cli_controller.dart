@@ -29,7 +29,7 @@ class CliController {
   static const String _brightMagenta = '\x1B[95m';
   static const String _brightCyan = '\x1B[96m';
 
-  void runInteractiveMode() {
+  Future<void> runInteractiveMode() async {
     _printWelcomeMessage();
     
     final projectName = _getProjectName();
@@ -51,7 +51,7 @@ class CliController {
     _printConfigurationSummary(config);
     
     if (_confirmConfiguration(config)) {
-      _createProject(config);
+      await _createProject(config);
     } else {
       _printCancelledMessage();
     }
@@ -340,30 +340,21 @@ class CliController {
     return _getYesNoChoice('${_brightYellow}${_bold}🚀 Ready to create your Flutter project?${_reset}', defaultYes: true);
   }
 
-  void _createProject(ProjectConfig config) {
+  Future<void> _createProject(ProjectConfig config) async {
     print('');
     print('${_brightGreen}${_bold}🚀 Creating your Flutter project...${_reset}');
     print('${_green}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${_reset}');
     print('');
     
     try {
-      _projectRepository.createProject(config);
+      await _projectRepository.createProject(config);
       
       print('');
       print('${_brightGreen}${_bold}✅ Project created successfully!${_reset}');
       print('');
       print('${_brightCyan}${_bold}🎉 Next steps:${_reset}');
       print('${_dim}   cd ${config.projectName}${_reset}');
-      print('${_dim}   flutter pub get${_reset}');
       print('${_dim}   flutter run${_reset}');
-      
-      print('');
-      print('${_brightYellow}${_bold}🌍 For localization (if needed):${_reset}');
-      print('${_dim}   dart run intl_utils:generate${_reset}');
-      
-      print('');
-      print('${_brightYellow}${_bold}For Freezed code generation:${_reset}');
-      print('${_dim}   dart run build_runner build -d${_reset}');
       
       print('');
       print('${_brightMagenta}${_bold}✨ Happy coding with FlutterForge! ✨${_reset}');

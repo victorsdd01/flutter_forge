@@ -71,7 +71,7 @@ class FlutterForgeCLI {
       await _checkForUpdates();
 
       // Always run in interactive mode
-      _runInteractiveMode();
+      await _runInteractiveMode();
     } catch (e) {
       print('Error: $e');
       _printUsage();
@@ -191,8 +191,8 @@ class FlutterForgeCLI {
     }
   }
 
-  void _runInteractiveMode() {
-    _cliController.runInteractiveMode();
+  Future<void> _runInteractiveMode() async {
+    await _cliController.runInteractiveMode();
   }
 
   Future<void> _updateCLI() async {

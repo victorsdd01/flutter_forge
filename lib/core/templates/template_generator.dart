@@ -10,7 +10,8 @@ class TemplateGenerator {
     required String projectPath,
   }) async {
     final templatePath = 'lib/core/templates/blocs';
-    await _copyTemplates(templatePath, projectPath, projectName);
+    final libPath = '$projectPath/lib';
+    await _copyTemplates(templatePath, libPath, projectName);
   }
 
   /// Copies templates from source to destination with name replacement
@@ -39,12 +40,21 @@ class TemplateGenerator {
 
     await for (final entity in source.list()) {
       final fileName = entity.path.split('/').last;
+      
+      if (fileName == 'pubspec.yaml' || fileName == 'pubspec.lock' || fileName == 'README.md' || fileName == 'build') {
+        continue;
+      }
+      
       final destinationPath = '${destination.path}/$fileName';
 
       if (entity is File) {
         final content = await File(entity.path).readAsString();
         final processedContent = _processTemplate(content, projectName);
-        await File(destinationPath).writeAsString(processedContent);
+        final destinationFile = File(destinationPath);
+        if (await destinationFile.exists()) {
+          await destinationFile.delete();
+        }
+        await destinationFile.writeAsString(processedContent);
       } else if (entity is Directory) {
         await _copyDirectoryRecursively(
           entity,
@@ -57,6 +67,8 @@ class TemplateGenerator {
 
   /// Processes template variables in content
   String _processTemplate(String content, String projectName) {
-    return content.replaceAll('{{project_name}}', projectName);
+    return content
+        .replaceAll('{{project_name}}', projectName)
+        .replaceAll('template_project', projectName);
   }
 }

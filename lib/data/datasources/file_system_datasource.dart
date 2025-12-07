@@ -47,14 +47,21 @@ class FileSystemDataSourceImpl implements FileSystemDataSource {
           'dartz: ^0.10.1',
           'path_provider: ^2.1.5',
           'equatable: ^2.0.7',
-          'get_it: ^8.0.3',
+          'get_it: ^8.2.0',
+          'dio: ^5.9.0',
+          'flutter_secure_storage: ^9.2.2',
+          'nested: ^1.0.0',
+          'pretty_dio_logger: ^1.4.0',
+          'talker_dio_logger: ^5.0.2',
+          'talker_flutter: ^5.0.2',
+          'flutter_form_builder: ^10.2.0',
+          'form_builder_validators: ^11.2.0',
         ]);
         
         if (includeFreezed) {
           dependencies.addAll([
             'json_annotation: ^4.9.0',
-            'freezed_annotation: ^2.4.4',
-            'freezed: ^2.5.7',
+            'freezed: ^3.2.0',
           ]);
         }
         break;
@@ -111,8 +118,8 @@ class FileSystemDataSourceImpl implements FileSystemDataSource {
     // Always add Freezed dev dependencies for Provider/None or when Freezed is selected
     if (includeFreezed || stateManagement == StateManagementType.provider || stateManagement == StateManagementType.none) {
       devDependencies.addAll([
-        'json_serializable: ^6.8.0',
-        'build_runner: ^2.4.13',
+        'json_serializable: ^6.9.5',
+        'build_runner: ^2.5.1',
       ]);
     }
 
@@ -206,15 +213,18 @@ flutter_intl:
 
   @override
   Future<void> createStateManagementTemplates(String projectName, StateManagementType stateManagement, bool includeFreezed) async {
-    // This method is only called for Clean Architecture
-    // MVVM templates are created in _createMvvmStructure
     switch (stateManagement) {
       case StateManagementType.bloc:
-        await _createBlocTemplates(projectName, includeFreezed);
+        final mainFile = File(path.join(projectName, 'lib/main.dart'));
+        if (await mainFile.exists()) {
+          await mainFile.delete();
+        }
+        await templateGenerator.generateProjectTemplates(
+          projectName: projectName,
+          projectPath: projectName,
+        );
         break;
       case StateManagementType.provider:
-        // Provider should not be in Clean Architecture
-        // It should use MVVM instead
         break;
       case StateManagementType.none:
         break;
@@ -296,141 +306,8 @@ flutter_intl:
     mainFile.writeAsStringSync(mainContent);
   }
 
-  Future<void> _createBlocTemplates(String projectName, bool includeFreezed) async {
-    final blocDir = path.join(projectName, 'lib/presentation/blocs');
-    
-    // Create directory if it doesn't exist
-    Directory(blocDir).createSync(recursive: true);
-    
-    if (includeFreezed) {
-      // Create Freezed BLoC files
-      final blocFile = File(path.join(blocDir, 'sample_bloc.dart'));
-      blocFile.writeAsStringSync(_generateFreezedBlocContent());
-
-      final eventFile = File(path.join(blocDir, 'sample_event.dart'));
-      eventFile.writeAsStringSync(_generateFreezedEventContent());
-
-      final stateFile = File(path.join(blocDir, 'sample_state.dart'));
-      stateFile.writeAsStringSync(_generateFreezedStateContent());
-    } else {
-      // Create regular BLoC files
-      final eventFile = File(path.join(blocDir, 'counter_event.dart'));
-      eventFile.writeAsStringSync(_generateBlocEventContent());
-
-      final stateFile = File(path.join(blocDir, 'counter_state.dart'));
-      stateFile.writeAsStringSync(_generateBlocStateContent());
-
-      final blocFile = File(path.join(blocDir, 'counter_bloc.dart'));
-      blocFile.writeAsStringSync(_generateBlocContent());
-    }
-  }
 
 
-  String _generateBlocEventContent() {
-    return '''
-import 'package:equatable/equatable.dart';
-
-abstract class CounterEvent extends Equatable {
-  const CounterEvent();
-
-  @override
-  List<Object> get props => [];
-}
-
-class IncrementCounter extends CounterEvent {}
-
-class DecrementCounter extends CounterEvent {}
-''';
-  }
-
-  String _generateBlocStateContent() {
-    return '''
-import 'package:equatable/equatable.dart';
-
-abstract class CounterState extends Equatable {
-  const CounterState();
-  
-  @override
-  List<Object> get props => [];
-}
-
-class CounterInitial extends CounterState {}
-
-class CounterLoading extends CounterState {}
-
-class CounterLoaded extends CounterState {
-  final int count;
-  
-  const CounterLoaded(this.count);
-  
-  @override
-  List<Object> get props => [count];
-}
-
-class CounterError extends CounterState {
-  final String message;
-  
-  const CounterError(this.message);
-  
-  @override
-  List<Object> get props => [message];
-}
-''';
-  }
-
-  String _generateBlocContent() {
-    return '''
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:hydrated_bloc/hydrated_bloc.dart';
-import 'package:bloc_concurrency/bloc_concurrency.dart';
-import 'counter_event.dart';
-import 'counter_state.dart';
-
-class CounterBloc extends HydratedBloc<CounterEvent, CounterState> {
-  CounterBloc() : super(CounterInitial()) {
-    on<IncrementCounter>(
-      _onIncrement,
-      transformer: restartable(),
-    );
-    on<DecrementCounter>(
-      _onDecrement,
-      transformer: restartable(),
-    );
-  }
-
-  void _onIncrement(IncrementCounter event, Emitter<CounterState> emit) {
-    if (state is CounterLoaded) {
-      final currentState = state as CounterLoaded;
-      emit(CounterLoaded(currentState.count + 1));
-    } else {
-      emit(const CounterLoaded(1));
-    }
-  }
-
-  void _onDecrement(DecrementCounter event, Emitter<CounterState> emit) {
-    if (state is CounterLoaded) {
-      final currentState = state as CounterLoaded;
-      if (currentState.count > 0) {
-        emit(CounterLoaded(currentState.count - 1));
-      }
-    }
-  }
-
-  @override
-  CounterState? fromJson(Map<String, dynamic> json) {
-    return CounterLoaded(json['count'] as int);
-  }
-
-  @override
-  Map<String, dynamic>? toJson(CounterState state) {
-    if (state is CounterLoaded) {
-      return {'count': state.count};
-    }
-    return null;
-  }
-}
-''';
-  }
 
   String _generateMainContent(StateManagementType stateManagement, bool includeGoRouter, bool includeCleanArchitecture, bool includeFreezed) {
     // Determine architecture type based on state management
@@ -1413,45 +1290,18 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Future<void> _createCleanArchitectureStructure(String projectName, StateManagementType stateManagement, bool includeGoRouter, bool includeFreezed) async {
-    // Create Clean Architecture directory structure
+    // Create Clean Architecture directory structure - only core, features are created by templates
     final cleanArchDirectories = [
       'lib/core',
       'lib/core/constants',
       'lib/core/errors',
       'lib/core/utils',
-      'lib/core/di',
-      'lib/domain',
-      'lib/domain/entities',
-      'lib/domain/repositories',
-      'lib/domain/usecases',
-      'lib/data',
-      'lib/data/datasources',
-      'lib/data/repositories',
-      'lib/data/models',
-      'lib/presentation',
-      'lib/presentation/pages',
-      'lib/presentation/widgets',
+      'lib/core/utils/helpers',
+      'lib/core/network',
+      'lib/core/services',
+      'lib/core/enums',
+      'lib/core/states',
     ];
-
-    // Add state management specific directories based on selection
-    switch (stateManagement) {
-      case StateManagementType.bloc:
-        cleanArchDirectories.add('lib/presentation/blocs');
-        break;
-      case StateManagementType.provider:
-        cleanArchDirectories.add('lib/presentation/providers');
-        break;
-      case StateManagementType.none:
-        // No state management directories needed
-        break;
-    }
-
-    // Add Go Router directories if requested
-    if (includeGoRouter) {
-      cleanArchDirectories.addAll([
-        'lib/routes',
-      ]);
-    }
 
     for (final dir in cleanArchDirectories) {
       Directory(path.join(projectName, dir)).createSync(recursive: true);
@@ -1512,34 +1362,6 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Future<void> _createCleanArchitectureBaseFiles(String projectName, StateManagementType stateManagement, bool includeFreezed) async {
-    // Create base entity
-    final entityFile = File(path.join(projectName, 'lib/domain/entities/base_entity.dart'));
-    entityFile.writeAsStringSync(_generateBaseEntityContent());
-
-    // Create sample entity
-    final sampleEntityFile = File(path.join(projectName, 'lib/domain/entities/sample_entity.dart'));
-    sampleEntityFile.writeAsStringSync(_generateSampleEntityContent(includeFreezed));
-
-    // Create base repository
-    final repositoryFile = File(path.join(projectName, 'lib/domain/repositories/base_repository.dart'));
-    repositoryFile.writeAsStringSync(_generateBaseRepositoryContent());
-
-    // Create sample repository interface
-    final sampleRepositoryFile = File(path.join(projectName, 'lib/domain/repositories/sample_repository.dart'));
-    sampleRepositoryFile.writeAsStringSync(_generateSampleRepositoryContent());
-
-    // Create base use case
-    final useCaseFile = File(path.join(projectName, 'lib/domain/usecases/base_usecase.dart'));
-    useCaseFile.writeAsStringSync(_generateBaseUseCaseContent());
-
-    // Create sample use case
-    final sampleUseCaseFile = File(path.join(projectName, 'lib/domain/usecases/sample_usecase.dart'));
-    sampleUseCaseFile.writeAsStringSync(_generateSampleUseCaseContent(projectName));
-
-    // Create dependency injection
-    final diFile = File(path.join(projectName, 'lib/core/di/dependency_injection.dart'));
-    diFile.writeAsStringSync(_generateDependencyInjectionContent(projectName, stateManagement, includeFreezed));
-
     // Create base error classes
     final errorFile = File(path.join(projectName, 'lib/core/errors/failures.dart'));
     errorFile.writeAsStringSync(_generateFailuresContent());
@@ -1547,13 +1369,6 @@ class _MyHomePageState extends State<MyHomePage> {
     // Create base constants
     final constantsFile = File(path.join(projectName, 'lib/core/constants/app_constants.dart'));
     constantsFile.writeAsStringSync(_generateAppConstantsContent());
-
-    // Create Clean Architecture HomePage
-    final homePageFile = File(path.join(projectName, 'lib/presentation/pages/home_page.dart'));
-    homePageFile.writeAsStringSync(_generateCleanArchitectureHomePageContent(projectName));
-
-    // Create data layer files
-    await _createDataLayerFiles(projectName, includeFreezed);
   }
 
 
@@ -1571,14 +1386,6 @@ abstract class BaseEntity extends Equatable {
 ''';
   }
 
-  String _generateBaseRepositoryContent() {
-    return '''
-/// Base repository interface for all repositories
-abstract class BaseRepository {
-  const BaseRepository();
-}
-''';
-  }
 
   String _generateSampleEntityContent(bool includeFreezed) {
     if (includeFreezed) {
@@ -1608,11 +1415,10 @@ abstract class SampleEntity with _\$SampleEntity {
 ''';
     } else {
       return '''import 'package:equatable/equatable.dart';
-import 'base_entity.dart';
 import '../../data/models/sample_model.dart';
 
 /// Sample entity for demonstration
-class SampleEntity extends BaseEntity {
+class SampleEntity extends Equatable {
   final String id;
   final String name;
   final String description;
@@ -1636,44 +1442,7 @@ class SampleEntity extends BaseEntity {
     }
   }
 
-  String _generateSampleRepositoryContent() {
-    return '''
-import 'package:dartz/dartz.dart';
-import '../entities/sample_entity.dart';
-import '../../core/errors/failures.dart';
-import 'base_repository.dart';
 
-/// Sample repository interface
-abstract class SampleRepository extends BaseRepository {
-  Future<Either<Failure, List<SampleEntity>>> getSamples();
-  Future<Either<Failure, SampleEntity>> getSampleById(String id);
-  Future<Either<Failure, SampleEntity>> createSample(SampleEntity sample);
-  Future<Either<Failure, SampleEntity>> updateSample(SampleEntity sample);
-  Future<Either<Failure, bool>> deleteSample(String id);
-}
-''';
-  }
-
-  String _generateBaseUseCaseContent() {
-    return '''
-import 'package:dartz/dartz.dart';
-import '../../core/errors/failures.dart';
-
-/// Base use case class for all use cases
-abstract class BaseUseCase<Type, Params> {
-  const BaseUseCase();
-  
-  Future<Either<Failure, Type>> call(Params params);
-}
-
-/// No parameters use case
-abstract class NoParamsUseCase<Type> {
-  const NoParamsUseCase();
-  
-  Future<Either<Failure, Type>> call();
-}
-''';
-  }
 
   String _generateFailuresContent() {
     return '''
@@ -1726,454 +1495,10 @@ class AppConstants {
 ''';
   }
 
-  String _generateSampleUseCaseContent(String projectName) {
-    return '''
-import 'package:dartz/dartz.dart';
-import '../../core/errors/failures.dart';
-import 'base_usecase.dart';
 
-/// Sample use case demonstrating Either<Failure, Type> pattern
-class SampleUseCase implements NoParamsUseCase<String> {
-  const SampleUseCase();
 
-  @override
-  Future<Either<Failure, String>> call() async {
-    try {
-      // Simulate async operation
-      await Future.delayed(const Duration(seconds: 1));
-      
-      // Return success
-      return const Right('Sample use case executed successfully!');
-    } catch (e) {
-      // Return failure
-      return Left(ServerFailure('Sample use case failed: \$e'));
-    }
-  }
-}
 
-/// Sample use case with parameters
-class SampleWithParamsUseCase implements BaseUseCase<String, SampleParams> {
-  const SampleWithParamsUseCase();
 
-  @override
-  Future<Either<Failure, String>> call(SampleParams params) async {
-    try {
-      // Simulate async operation with parameters
-      await Future.delayed(const Duration(seconds: 1));
-      
-      // Return success with parameter
-      return Right('Hello \${params.name}! Use case executed successfully!');
-    } catch (e) {
-      // Return failure
-      return Left(ServerFailure('Sample use case failed: \$e'));
-    }
-  }
-}
-
-/// Sample parameters class
-class SampleParams {
-  final String name;
-  
-  const SampleParams({required this.name});
-}
-''';
-  }
-
-  String _generateCleanArchitectureHomePageContent(String projectName) {
-    return '''
-import 'package:flutter/material.dart';
-import '../../core/di/dependency_injection.dart';
-
-/// Clean Architecture HomePage
-/// This page follows Clean Architecture principles and is located in the presentation layer
-class HomePage extends StatefulWidget {
-  const HomePage({super.key});
-
-  @override
-  State<HomePage> createState() => _HomePageState();
-}
-
-class _HomePageState extends State<HomePage> {
-  int _counter = 0;
-
-  void _incrementCounter() {
-    setState(() {
-      _counter++;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: const Text('Clean Architecture Home'),
-        centerTitle: true,
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text(
-              'Welcome to Clean Architecture!',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'You have pushed the button this many times:',
-              style: TextStyle(fontSize: 16),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              '\$_counter',
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                color: Theme.of(context).primaryColor,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 30),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey[300]!),
-              ),
-              child: const Column(
-                children: [
-                  Text(
-                    '🏗️ Clean Architecture Structure:',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                  SizedBox(height: 8),
-                  Text('• lib/core/ - Constants, Errors, Utils, DI'),
-                  Text('• lib/domain/ - Entities, Repositories, Use Cases'),
-                  Text('• lib/data/ - Data Sources, Repositories, Models'),
-                  Text('• lib/presentation/ - Pages, Widgets, BLoCs'),
-                  SizedBox(height: 8),
-                  Text(
-                    '💉 Dependency Injection: GetIt + Custom Injector',
-                    style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ),
-    );
-  }
-}
-''';
-  }
-
-  Future<void> _createDataLayerFiles(String projectName, bool includeFreezed) async {
-    // Create sample model
-    final sampleModelFile = File(path.join(projectName, 'lib/data/models/sample_model.dart'));
-    sampleModelFile.writeAsStringSync(_generateSampleModelContent(includeFreezed));
-
-    // Create sample repository implementation
-    final sampleRepositoryImplFile = File(path.join(projectName, 'lib/data/repositories/sample_repository_impl.dart'));
-    sampleRepositoryImplFile.writeAsStringSync(_generateSampleRepositoryImplContent());
-
-    // Create sample data source
-    final sampleDataSourceFile = File(path.join(projectName, 'lib/data/datasources/sample_data_source.dart'));
-    sampleDataSourceFile.writeAsStringSync(_generateSampleDataSourceContent());
-  }
-
-  String _generateSampleDataSourceContent() {
-    return '''
-import 'package:dartz/dartz.dart';
-import '../../core/errors/failures.dart';
-import '../models/sample_model.dart';
-
-/// Sample data source interface
-abstract class SampleDataSource {
-  Future<Either<Failure, List<SampleModel>>> getSamples();
-  Future<Either<Failure, SampleModel>> getSampleById(String id);
-  Future<Either<Failure, SampleModel>> createSample(SampleModel sample);
-  Future<Either<Failure, SampleModel>> updateSample(SampleModel sample);
-  Future<Either<Failure, bool>> deleteSample(String id);
-}
-
-/// Remote data source implementation
-class SampleRemoteDataSource implements SampleDataSource {
-  @override
-  Future<Either<Failure, List<SampleModel>>> getSamples() async {
-    try {
-      // Simulate API call
-      await Future.delayed(const Duration(seconds: 1));
-      
-      final samples = [
-        const SampleModel(id: '1', name: 'Sample 1', description: 'Description 1'),
-        const SampleModel(id: '2', name: 'Sample 2', description: 'Description 2'),
-      ];
-      
-      return Right(samples);
-    } catch (e) {
-      return Left(ServerFailure('Failed to fetch samples: \$e'));
-    }
-  }
-
-  @override
-  Future<Either<Failure, SampleModel>> getSampleById(String id) async {
-    try {
-      // Simulate API call
-      await Future.delayed(const Duration(seconds: 1));
-      
-      final sample = SampleModel(id: id, name: 'Sample \$id', description: 'Description \$id');
-      return Right(sample);
-    } catch (e) {
-      return Left(ServerFailure('Failed to fetch sample: \$e'));
-    }
-  }
-
-  @override
-  Future<Either<Failure, SampleModel>> createSample(SampleModel sample) async {
-    try {
-      // Simulate API call
-      await Future.delayed(const Duration(seconds: 1));
-      return Right(sample);
-    } catch (e) {
-      return Left(ServerFailure('Failed to create sample: \$e'));
-    }
-  }
-
-  @override
-  Future<Either<Failure, SampleModel>> updateSample(SampleModel sample) async {
-    try {
-      // Simulate API call
-      await Future.delayed(const Duration(seconds: 1));
-      return Right(sample);
-    } catch (e) {
-      return Left(ServerFailure('Failed to update sample: \$e'));
-    }
-  }
-
-  @override
-  Future<Either<Failure, bool>> deleteSample(String id) async {
-    try {
-      // Simulate API call
-      await Future.delayed(const Duration(seconds: 1));
-      return const Right(true);
-    } catch (e) {
-      return Left(ServerFailure('Failed to delete sample: \$e'));
-    }
-  }
-}
-
-/// Local data source implementation
-class SampleLocalDataSource implements SampleDataSource {
-  @override
-  Future<Either<Failure, List<SampleModel>>> getSamples() async {
-    try {
-      // Simulate local storage
-      await Future.delayed(const Duration(milliseconds: 100));
-      
-      final samples = [
-        const SampleModel(id: '1', name: 'Local Sample 1', description: 'Local Description 1'),
-        const SampleModel(id: '2', name: 'Local Sample 2', description: 'Local Description 2'),
-      ];
-      
-      return Right(samples);
-    } catch (e) {
-      return Left(CacheFailure('Failed to fetch samples from cache: \$e'));
-    }
-  }
-
-  @override
-  Future<Either<Failure, SampleModel>> getSampleById(String id) async {
-    try {
-      // Simulate local storage
-      await Future.delayed(const Duration(milliseconds: 100));
-      
-      final sample = SampleModel(id: id, name: 'Local Sample \$id', description: 'Local Description \$id');
-      return Right(sample);
-    } catch (e) {
-      return Left(CacheFailure('Failed to fetch sample from cache: \$e'));
-    }
-  }
-
-  @override
-  Future<Either<Failure, SampleModel>> createSample(SampleModel sample) async {
-    try {
-      // Simulate local storage
-      await Future.delayed(const Duration(milliseconds: 100));
-      return Right(sample);
-    } catch (e) {
-      return Left(CacheFailure('Failed to create sample in cache: \$e'));
-    }
-  }
-
-  @override
-  Future<Either<Failure, SampleModel>> updateSample(SampleModel sample) async {
-    try {
-      // Simulate local storage
-      await Future.delayed(const Duration(milliseconds: 100));
-      return Right(sample);
-    } catch (e) {
-      return Left(CacheFailure('Failed to update sample in cache: \$e'));
-    }
-  }
-
-  @override
-  Future<Either<Failure, bool>> deleteSample(String id) async {
-    try {
-      // Simulate local storage
-      await Future.delayed(const Duration(milliseconds: 100));
-      return const Right(true);
-    } catch (e) {
-      return Left(CacheFailure('Failed to delete sample from cache: \$e'));
-    }
-  }
-}
-''';
-  }
-
-  String _generateSampleRepositoryImplContent() {
-    return '''
-import 'package:dartz/dartz.dart';
-import '../../domain/entities/sample_entity.dart';
-import '../../domain/repositories/sample_repository.dart';
-import '../../core/errors/failures.dart';
-import '../datasources/sample_data_source.dart';
-import '../models/sample_model.dart';
-
-/// Implementation of SampleRepository
-class SampleRepositoryImpl implements SampleRepository {
-  final SampleDataSource _remoteDataSource;
-  final SampleDataSource _localDataSource;
-
-  SampleRepositoryImpl({
-    required SampleDataSource remoteDataSource,
-    required SampleDataSource localDataSource,
-  })  : _remoteDataSource = remoteDataSource,
-        _localDataSource = localDataSource;
-
-  @override
-  Future<Either<Failure, List<SampleEntity>>> getSamples() async {
-    try {
-      // Try remote first, fallback to local
-      final remoteResult = await _remoteDataSource.getSamples();
-      
-      return remoteResult.fold(
-        (failure) async {
-          // If remote fails, try local
-          final localResult = await _localDataSource.getSamples();
-          return localResult.fold(
-            (localFailure) => Left(ServerFailure('Both remote and local failed')),
-            (localSamples) => Right(localSamples.map((model) => SampleEntity.fromModel(model)).toList()),
-          );
-        },
-        (models) async {
-          // If remote succeeds, cache the data
-          for (final model in models) {
-            await _localDataSource.createSample(model);
-          }
-          return Right(models.map((model) => SampleEntity.fromModel(model)).toList());
-        },
-      );
-    } catch (e) {
-      return Left(ServerFailure('Repository error: \$e'));
-    }
-  }
-
-  @override
-  Future<Either<Failure, SampleEntity>> getSampleById(String id) async {
-    try {
-      // Try remote first, fallback to local
-      final remoteResult = await _remoteDataSource.getSampleById(id);
-      
-      return remoteResult.fold(
-        (failure) async {
-          // If remote fails, try local
-          final localResult = await _localDataSource.getSampleById(id);
-          return localResult.fold(
-            (localFailure) => Left(ServerFailure('Sample not found')),
-            (localModel) => Right(SampleEntity.fromModel(localModel)),
-          );
-        },
-        (model) async {
-          // If remote succeeds, cache the data
-          await _localDataSource.createSample(model);
-          return Right(SampleEntity.fromModel(model));
-        },
-      );
-    } catch (e) {
-      return Left(ServerFailure('Repository error: \$e'));
-    }
-  }
-
-  @override
-  Future<Either<Failure, SampleEntity>> createSample(SampleEntity sample) async {
-    try {
-      // Convert entity to model for datasource
-      final model = SampleModel.fromEntity(sample);
-      
-      // Create in remote first
-      final remoteResult = await _remoteDataSource.createSample(model);
-      
-      return remoteResult.fold(
-        (failure) => Left(failure),
-        (createdModel) async {
-          // If remote succeeds, cache locally
-          await _localDataSource.createSample(createdModel);
-          return Right(SampleEntity.fromModel(createdModel));
-        },
-      );
-    } catch (e) {
-      return Left(ServerFailure('Repository error: \$e'));
-    }
-  }
-
-  @override
-  Future<Either<Failure, SampleEntity>> updateSample(SampleEntity sample) async {
-    try {
-      // Convert entity to model for datasource
-      final model = SampleModel.fromEntity(sample);
-      
-      // Update in remote first
-      final remoteResult = await _remoteDataSource.updateSample(model);
-      
-      return remoteResult.fold(
-        (failure) => Left(failure),
-        (updatedModel) async {
-          // If remote succeeds, update locally
-          await _localDataSource.updateSample(updatedModel);
-          return Right(SampleEntity.fromModel(updatedModel));
-        },
-      );
-    } catch (e) {
-      return Left(ServerFailure('Repository error: \$e'));
-    }
-  }
-
-  @override
-  Future<Either<Failure, bool>> deleteSample(String id) async {
-    try {
-      // Delete from remote first
-      final remoteResult = await _remoteDataSource.deleteSample(id);
-      
-      return remoteResult.fold(
-        (failure) => Left(failure),
-        (success) async {
-          // If remote succeeds, delete locally
-          await _localDataSource.deleteSample(id);
-          return Right(success);
-        },
-      );
-    } catch (e) {
-      return Left(ServerFailure('Repository error: \$e'));
-    }
-  }
-}
-''';
-  }
 
   String _generateSampleModelContent(bool includeFreezed) {
     if (includeFreezed) {
@@ -2185,7 +1510,7 @@ part 'sample_model.g.dart';
 
 /// Sample model for demonstration
 @freezed
-class SampleModel with _\$SampleModel {
+abstract class SampleModel with _\$SampleModel {
   const factory SampleModel({
     required String id,
     required String name,
@@ -2278,83 +1603,25 @@ linter:
   Future<void> createBarrelFiles(String projectName, StateManagementType stateManagement, bool includeCleanArchitecture, bool includeFreezed) async {
     if (!includeCleanArchitecture) return;
 
-    // Create barrel files for each layer
+    // Create barrel files - only core, features are created by templates
     await _createCoreBarrelFile(projectName);
-    await _createDomainBarrelFile(projectName);
-    await _createDataBarrelFile(projectName);
-    await _createPresentationBarrelFile(projectName, stateManagement, includeFreezed);
   }
 
   Future<void> _createCoreBarrelFile(String projectName) async {
     final barrelFile = File(path.join(projectName, 'lib/core/core.dart'));
     final content = '''
 // Core layer exports
-export 'constants/app_constants.dart';
-export 'di/dependency_injection.dart';
 export 'errors/failures.dart';
+export 'network/http_client.dart';
+export 'services/talker_service.dart';
+export 'utils/secure_storage_utils.dart';
+export 'enums/server_status.dart';
 ''';
     barrelFile.writeAsStringSync(content);
   }
 
-  Future<void> _createDomainBarrelFile(String projectName) async {
-    final barrelFile = File(path.join(projectName, 'lib/domain/domain.dart'));
-    final content = '''
-// Domain layer exports
-export 'entities/base_entity.dart';
-export 'entities/sample_entity.dart';
-export 'repositories/base_repository.dart';
-export 'repositories/sample_repository.dart';
-export 'usecases/base_usecase.dart';
-export 'usecases/sample_usecase.dart';
-''';
-    barrelFile.writeAsStringSync(content);
-  }
 
-  Future<void> _createDataBarrelFile(String projectName) async {
-    final barrelFile = File(path.join(projectName, 'lib/data/data.dart'));
-    final content = '''
-// Data layer exports
-export 'datasources/sample_data_source.dart';
-export 'repositories/sample_repository_impl.dart';
-export 'models/sample_model.dart';
-''';
-    barrelFile.writeAsStringSync(content);
-  }
 
-  Future<void> _createPresentationBarrelFile(String projectName, StateManagementType stateManagement, bool includeFreezed) async {
-    final barrelFile = File(path.join(projectName, 'lib/presentation/presentation.dart'));
-    
-    String content = '''
-// Presentation layer exports
-export 'pages/home_page.dart';
-''';
-
-    // Add state management specific exports
-    switch (stateManagement) {
-      case StateManagementType.bloc:
-        if (includeFreezed) {
-          content += '''
-export 'blocs/sample_bloc.dart';
-''';
-        } else {
-          content += '''
-export 'blocs/counter_bloc.dart';
-export 'blocs/counter_event.dart';
-export 'blocs/counter_state.dart';
-''';
-        }
-        break;
-      case StateManagementType.provider:
-        content += '''
-export 'providers/counter_provider.dart';
-''';
-        break;
-      case StateManagementType.none:
-        break;
-    }
-
-    barrelFile.writeAsStringSync(content);
-  }
 
   @override
   Future<void> createInternationalization(String projectName) async {
@@ -2465,88 +1732,8 @@ class AppLocalizationsSetup {
     buildYamlFile.writeAsStringSync(content);
   }
 
-  String _generateFreezedBlocContent() {
-    return '''import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:hydrated_bloc/hydrated_bloc.dart';
-import 'package:dartz/dartz.dart';
-import 'package:freezed_annotation/freezed_annotation.dart';
-import '../../../core/errors/failures.dart';
-import '../../../domain/usecases/sample_usecase.dart';
 
-part 'sample_bloc.g.dart';
-part 'sample_bloc.freezed.dart';
-part 'sample_event.dart';
-part 'sample_state.dart';
 
-class SampleBloc extends HydratedBloc<SampleEvent, SampleState> {
-  final SampleUseCase _sampleUseCase;
-
-  SampleBloc({required SampleUseCase sampleUseCase}) 
-    : _sampleUseCase = sampleUseCase, super(const SampleState()) {
-    on<SampleEvent>((SampleEvent event, Emitter<SampleState> emit) async {
-      switch (event) {
-         case _FetchData():
-          {
-            final Either<Failure, String> result = await _sampleUseCase();
-            result.fold(
-              (Failure failure) => emit(state.copyWith(failure: failure)),
-              (String data) {
-                emit(state.copyWith(
-                  status: SampleStatus.success,
-                  data: data,
-                ));
-              },
-            );
-            break;
-          }
-      }
-    });
-  }
-
-  @override
-  SampleState? fromJson(Map<String, dynamic> json) => SampleState.fromJson(json);
-
-  @override
-  Map<String, dynamic>? toJson(SampleState state) => state.toJson();
-}
-''';
-  }
-
-  String _generateFreezedEventContent() {
-    return '''part of 'sample_bloc.dart';
-
-@freezed
-sealed class SampleEvent with _\$SampleEvent {
-  const factory SampleEvent.fetchData() = _FetchData;
-}
-''';
-  }
-
-  String _generateFreezedStateContent() {
-    return '''part of 'sample_bloc.dart';
-
-enum SampleStatus { 
-  initial,
-  loading,
-  success,
-  error,
-}
-
-@freezed
-sealed class SampleState with _\$SampleState {
-  const factory SampleState({
-    @Default(SampleStatus.initial) SampleStatus status,
-    @JsonKey(
-      includeFromJson: false,
-      includeToJson:   false,
-    ) Failure? failure,
-    @Default('') String data,
-  }) = _SampleState;
-
-  factory SampleState.fromJson(Map<String, dynamic> json) => _\$SampleStateFromJson(json);
-}
-''';
-  }
 
   Future<void> _createMvvmBaseFiles(String projectName, StateManagementType stateManagement, bool includeFreezed) async {
     // Create base entity
@@ -3317,48 +2504,4 @@ class _HomePageState extends State<HomePage> {
 ''';
   }
 
-  String _generateDependencyInjectionContent(String projectName, StateManagementType stateManagement, bool includeFreezed) {
-    final String stateManagementImport = stateManagement == StateManagementType.bloc 
-        ? "import 'package:flutter_bloc/flutter_bloc.dart';"
-        : stateManagement == StateManagementType.provider 
-            ? "import 'package:provider/provider.dart';"
-            : "";
-    
-    final String stateManagementRegistration = stateManagement == StateManagementType.bloc 
-        ? '''
-    // Register BLoCs
-    getIt.registerFactory<MainBloc>(() => MainBloc());'''
-        : stateManagement == StateManagementType.provider 
-            ? '''
-    // Register Providers
-    getIt.registerFactory<MainProvider>(() => MainProvider());'''
-            : "";
-
-    return '''
-import 'package:get_it/get_it.dart';
-$stateManagementImport
-
-final GetIt getIt = GetIt.instance;
-
-class DependencyInjection {
-  static Future<void> init() async {
-    // Register repositories
-    // getIt.registerLazySingleton<ProjectRepository>(
-    //   () => ProjectRepositoryImpl(getIt()),
-    // );
-    
-    // Register data sources
-    // getIt.registerLazySingleton<FileSystemDataSource>(
-    //   () => FileSystemDataSourceImpl(),
-    // );
-    
-    // Register use cases
-    // getIt.registerLazySingleton<CreateProjectUseCase>(
-    //   () => CreateProjectUseCase(getIt()),
-    // );
-$stateManagementRegistration
-  }
-}
-''';
-  }
 }
