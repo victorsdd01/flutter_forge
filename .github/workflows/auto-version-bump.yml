@@ -48,8 +48,19 @@ jobs:
           echo "PR Title: $PR_TITLE"
           echo "PR Author: $PR_AUTHOR"
           
-          echo "pr_title=$PR_TITLE" >> $GITHUB_OUTPUT
-          echo "pr_body=$PR_BODY" >> $GITHUB_OUTPUT
+          # Use delimiter to handle multiline content safely
+          {
+            echo "pr_title<<EOF"
+            echo "$PR_TITLE"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+          
+          {
+            echo "pr_body<<EOF"
+            echo "$PR_BODY"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+          
           echo "pr_author=$PR_AUTHOR" >> $GITHUB_OUTPUT
 
       - name: Update pubspec.yaml
