@@ -13,6 +13,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  issues: write
 
 jobs:
   bump-version:
@@ -268,24 +269,34 @@ jobs:
           VERSION="${{ steps.get_version.outputs.version }}"
           BRANCH_NAME="${{ steps.version_bump.outputs.branch }}"
           
-          # Create PR using GitHub CLI
-          PR_BODY=$(cat <<EOF
-          This PR was automatically created to bump the version after ${{ github.event_name == 'pull_request' && format('merging PR #{0}', github.event.pull_request.number) || 'a push to main' }}.
+          # Determine PR trigger source
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            TRIGGER_SOURCE="merging PR #${{ github.event.pull_request.number }}"
+          else
+            TRIGGER_SOURCE="a push to main"
+          fi
+          
+          # Create PR body file to avoid shell escaping issues
+          cat > /tmp/pr_body.txt << 'BODYEOF'
+          This PR was automatically created to bump the version after TRIGGER_PLACEHOLDER.
           
           **Changes:**
-          - Updated \`pubspec.yaml\` version to \`$VERSION\`
-          - Updated \`CHANGELOG.md\` with new release entry
+          - Updated `pubspec.yaml` version to VERSION_PLACEHOLDER
+          - Updated `CHANGELOG.md` with new release entry
           
           This PR will be auto-merged if branch protection allows.
-          EOF
-          )
+          BODYEOF
+          
+          # Replace placeholders
+          sed -i "s/TRIGGER_PLACEHOLDER/$TRIGGER_SOURCE/g" /tmp/pr_body.txt
+          sed -i "s/VERSION_PLACEHOLDER/$VERSION/g" /tmp/pr_body.txt
           
           # Check which labels exist in the repository
           AVAILABLE_LABELS=""
-          if gh label list --json name --jq '.[].name' | grep -q "^automated$"; then
+          if gh label list --json name --jq '.[].name' 2>/dev/null | grep -q "^automated$"; then
             AVAILABLE_LABELS="automated"
           fi
-          if gh label list --json name --jq '.[].name' | grep -q "^chore$"; then
+          if gh label list --json name --jq '.[].name' 2>/dev/null | grep -q "^chore$"; then
             if [ -n "$AVAILABLE_LABELS" ]; then
               AVAILABLE_LABELS="$AVAILABLE_LABELS,chore"
             else
@@ -293,24 +304,28 @@ jobs:
             fi
           fi
           
-          # Build PR create command
-          PR_CMD="gh pr create --title \"chore: bump version to $VERSION [skip ci]\" --body \"$PR_BODY\" --base main --head \"$BRANCH_NAME\""
-          
-          # Add labels only if they exist
+          # Create PR with proper escaping
           if [ -n "$AVAILABLE_LABELS" ]; then
-            PR_CMD="$PR_CMD --label \"$AVAILABLE_LABELS\""
             echo "Using labels: $AVAILABLE_LABELS"
+            PR_OUTPUT=$(gh pr create \
+              --title "chore: bump version to $VERSION [skip ci]" \
+              --body-file /tmp/pr_body.txt \
+              --base main \
+              --head "$BRANCH_NAME" \
+              --label "$AVAILABLE_LABELS" 2>&1) || PR_EXIT_CODE=$?
           else
             echo "⚠️ Labels 'automated' and 'chore' not found. Creating PR without labels."
+            PR_OUTPUT=$(gh pr create \
+              --title "chore: bump version to $VERSION [skip ci]" \
+              --body-file /tmp/pr_body.txt \
+              --base main \
+              --head "$BRANCH_NAME" 2>&1) || PR_EXIT_CODE=$?
           fi
           
-          # Create PR and capture output
-          PR_OUTPUT=$(eval "$PR_CMD" 2>&1) || PR_EXIT_CODE=$?
-          
-          if [ -z "$PR_EXIT_CODE" ] && [ -n "$PR_OUTPUT" ]; then
+          if [ -z "${PR_EXIT_CODE:-}" ] && [ -n "$PR_OUTPUT" ]; then
             # Extract PR number from output (format: "https://github.com/owner/repo/pull/123")
-            PR_NUMBER=$(echo "$PR_OUTPUT" | grep -oP 'pull/\K[0-9]+' | head -1)
-            PR_URL=$(echo "$PR_OUTPUT" | grep -oP 'https://[^\s]+' | head -1)
+            PR_NUMBER=$(echo "$PR_OUTPUT" | grep -oE 'pull/[0-9]+' | head -1 | cut -d'/' -f2)
+            PR_URL=$(echo "$PR_OUTPUT" | grep -oE 'https://[^\s]+' | head -1)
             
             if [ -n "$PR_NUMBER" ]; then
               echo "✅ Created PR #$PR_NUMBER: $PR_URL"
