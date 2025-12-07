@@ -2,7 +2,7 @@ name: Auto Version Bump
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, ready_for_review]
     branches: [main]
 
 permissions:
@@ -16,12 +16,15 @@ jobs:
       !contains(github.event.pull_request.title, 'chore: bump version') &&
       github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
-          ref: ${{ github.event.pull_request.head.ref }}
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
           persist-credentials: true
 
@@ -30,12 +33,15 @@ jobs:
         run: |
           # Check if this PR already has a version bump commit
           if git log --oneline --grep="chore: bump version" | head -1 | grep -q "chore: bump version"; then
-            echo "Version bump already done in this PR, skipping..."
+            echo "✅ Version bump already done in this PR, skipping..."
             echo "already_done=true" >> $GITHUB_OUTPUT
           else
             echo "Version bump needed"
             echo "already_done=false" >> $GITHUB_OUTPUT
           fi
+          
+          # Always report success to GitHub (so the check passes even if already done)
+          echo "✅ Version bump check completed successfully"
 
       - name: Get current version (for release)
         if: steps.check_version_bump.outputs.already_done == 'false'
