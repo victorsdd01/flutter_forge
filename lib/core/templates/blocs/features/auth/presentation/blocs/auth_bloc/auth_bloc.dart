@@ -1,0 +1,112 @@
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:hydrated_bloc/hydrated_bloc.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:dartz/dartz.dart';
+import '../../../../../core/errors/failures.dart';
+import '../../../domain/use_cases/auth_use_cases.dart';
+import '../../../domain/entities/user_entity.dart';
+
+part 'auth_bloc.freezed.dart';
+part 'auth_event.dart';
+part 'auth_state.dart';
+
+class AuthBloc extends HydratedBloc<AuthEvent, AuthState> {
+  final AuthUseCases _authUseCases;
+
+  AuthBloc({
+    required AuthUseCases authUseCases,
+  }) : _authUseCases = authUseCases,
+       super(const AuthState()) {
+    on<AuthEvent>((AuthEvent event, Emitter<AuthState> emit) async {
+      await event.map(
+        login: (e) async {
+          emit(state.copyWith(isLoading: true, failure: null));
+          final Either<Failure, UserEntity> result = await _authUseCases.login(e.email, e.password);
+          result.fold(
+            (Failure failure) => emit(
+              state.copyWith(failure: failure, isLoading: false, isAuthenticated: false),
+            ),
+            (UserEntity user) => emit(
+              state.copyWith(
+                user: user,
+                isLoading: false,
+                failure: null,
+                isAuthenticated: true,
+              ),
+            ),
+          );
+        },
+        register: (e) async {
+          emit(state.copyWith(isLoading: true, failure: null));
+          final Either<Failure, UserEntity> result = await _authUseCases.register(e.email, e.password, e.name);
+          result.fold(
+            (Failure failure) => emit(
+              state.copyWith(failure: failure, isLoading: false, isAuthenticated: false),
+            ),
+            (UserEntity user) => emit(
+              state.copyWith(
+                user: user,
+                isLoading: false,
+                failure: null,
+                isAuthenticated: true,
+              ),
+            ),
+          );
+        },
+        logout: (e) async {
+          emit(state.copyWith(isLoading: true, failure: null));
+          final Either<Failure, void> result = await _authUseCases.logout();
+          result.fold(
+            (Failure failure) => emit(
+              state.copyWith(failure: failure, isLoading: false),
+            ),
+            (_) => emit(
+              state.copyWith(
+                user: null,
+                isLoading: false,
+                failure: null,
+                isAuthenticated: false,
+              ),
+            ),
+          );
+        },
+        checkAuth: (e) async {
+          emit(state.copyWith(isLoading: true, failure: null));
+          final Either<Failure, bool> result = await _authUseCases.isAuthenticated();
+          result.fold(
+            (Failure failure) => emit(
+              state.copyWith(failure: failure, isLoading: false, isAuthenticated: false),
+            ),
+            (bool isAuth) async {
+              if (isAuth) {
+                final Either<Failure, UserEntity?> userResult = await _authUseCases.getCurrentUser();
+                userResult.fold(
+                  (Failure failure) => emit(
+                    state.copyWith(failure: failure, isLoading: false, isAuthenticated: false),
+                  ),
+                  (UserEntity? user) => emit(
+                    state.copyWith(
+                      user: user,
+                      isLoading: false,
+                      failure: null,
+                      isAuthenticated: user != null,
+                    ),
+                  ),
+                );
+              } else {
+                emit(state.copyWith(isLoading: false, isAuthenticated: false));
+              }
+            },
+          );
+        },
+      );
+    });
+  }
+
+  @override
+  AuthState? fromJson(Map<String, dynamic> json) => null;
+
+  @override
+  Map<String, dynamic>? toJson(AuthState state) => null;
+}
+

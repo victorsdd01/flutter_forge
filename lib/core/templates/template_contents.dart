@@ -1,6 +1,66 @@
 class TemplateContents {
   TemplateContents._();
 
+  static const String _core_database_app_database_dart = r'''import 'dart:io';
+import 'package:drift/drift.dart';
+import 'package:drift/native.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
+
+part 'app_database.g.dart';
+
+class Users extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get email => text()();
+  TextColumn get name => text().nullable()();
+  TextColumn get token => text().nullable()();
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+}
+
+@DriftDatabase(tables: [Users])
+class AppDatabase extends _$AppDatabase {
+  AppDatabase() : super(_openConnection());
+
+  @override
+  int get schemaVersion => 1;
+
+  Future<User?> getUserByEmail(String email) async {
+    final query = select(users)..where((u) => u.email.equals(email));
+    return await query.getSingleOrNull();
+  }
+
+  Future<int> insertUser(UsersCompanion user) async {
+    return await into(users).insert(user);
+  }
+
+  Future<bool> updateUser(User user) async {
+    await (update(users)..where((u) => u.id.equals(user.id))).replace(user);
+    return true;
+  }
+
+  Future<bool> deleteUser(int id) async {
+    final deleted = await (delete(users)..where((u) => u.id.equals(id))).go();
+    return deleted > 0;
+  }
+
+  Future<void> clearUsers() async {
+    await delete(users).go();
+  }
+
+  Future<List<User>> getAllUsers() async {
+    return await select(users).get();
+  }
+}
+
+LazyDatabase _openConnection() {
+  return LazyDatabase(() async {
+    final dbFolder = await getApplicationDocumentsDirectory();
+    final file = File(p.join(dbFolder.path, 'app.db'));
+    return NativeDatabase(file);
+  });
+}
+
+''';
   static const String _core_core_dart = r'''export 'errors/failures.dart';
 export 'utils/helpers/number_helper.dart';
 export 'utils/secure_storage_utils.dart';
@@ -733,6 +793,641 @@ class HomeView extends StatelessWidget {
 }
 
 ''';
+  static const String _features_auth_data_datasources_local_auth_local_datasource_dart = r'''import 'package:dartz/dartz.dart';
+import '../../../../../core/errors/failures.dart';
+import '../../../../../core/database/app_database.dart';
+import '../../models/user_model.dart';
+import 'package:drift/drift.dart';
+
+abstract interface class AuthLocalDataSource {
+  Future<Either<Failure, UserModel?>> getUserByEmail(String email);
+  Future<Either<Failure, List<UserModel>>> getAllUsers();
+  Future<Either<Failure, void>> saveUser(UserModel user);
+  Future<Either<Failure, void>> deleteUser(String userId);
+  Future<Either<Failure, void>> clearUsers();
+}
+
+class AuthLocalDataSourceImpl implements AuthLocalDataSource {
+  final AppDatabase _database;
+
+  AuthLocalDataSourceImpl({
+    required AppDatabase database,
+  }) : _database = database;
+
+  @override
+  Future<Either<Failure, UserModel?>> getUserByEmail(String email) async {
+    try {
+      final user = await _database.getUserByEmail(email);
+      if (user == null) {
+        return const Right(null);
+      }
+      final model = UserModel(
+        id: user.id.toString(),
+        email: user.email,
+        name: user.name,
+        token: user.token,
+        createdAt: user.createdAt,
+      );
+      return Right(model);
+    } catch (e) {
+      return Left<Failure, UserModel?>(CacheFailure(message: 'Failed to get user: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> saveUser(UserModel user) async {
+    try {
+      final existingUser = await _database.getUserByEmail(user.email);
+      if (existingUser != null) {
+        await _database.updateUser(
+          User(
+            id: existingUser.id,
+            email: user.email,
+            name: user.name,
+            token: user.token,
+            createdAt: existingUser.createdAt,
+          ),
+        );
+      } else {
+        await _database.insertUser(
+          UsersCompanion(
+            email: Value(user.email),
+            name: Value(user.name),
+            token: Value(user.token),
+          ),
+        );
+      }
+      return const Right(null);
+    } catch (e) {
+      return Left<Failure, void>(CacheFailure(message: 'Failed to save user: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> deleteUser(String userId) async {
+    try {
+      await _database.deleteUser(int.parse(userId));
+      return const Right(null);
+    } catch (e) {
+      return Left<Failure, void>(CacheFailure(message: 'Failed to delete user: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<UserModel>>> getAllUsers() async {
+    try {
+      final users = await _database.getAllUsers();
+      final models = users.map((user) => UserModel(
+        id: user.id.toString(),
+        email: user.email,
+        name: user.name,
+        token: user.token,
+        createdAt: user.createdAt,
+      )).toList();
+      return Right(models);
+    } catch (e) {
+      return Left<Failure, List<UserModel>>(CacheFailure(message: 'Failed to get users: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> clearUsers() async {
+    try {
+      await _database.clearUsers();
+      return const Right(null);
+    } catch (e) {
+      return Left<Failure, void>(CacheFailure(message: 'Failed to clear users: $e'));
+    }
+  }
+}
+
+''';
+  static const String _features_auth_data_datasources_remote_auth_remote_datasource_dart = r'''import 'package:dartz/dartz.dart';
+import '../../../../../core/errors/failures.dart';
+import '../../models/user_model.dart';
+
+abstract interface class AuthRemoteDataSource {
+  Future<Either<Failure, UserModel>> login(String email, String password);
+  Future<Either<Failure, UserModel>> register(String email, String password, String? name);
+}
+
+class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
+  AuthRemoteDataSourceImpl();
+
+  @override
+  Future<Either<Failure, UserModel>> login(String email, String password) async {
+    try {
+      await Future<void>.delayed(const Duration(seconds: 1));
+      
+      final mockUser = UserModel(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        email: email,
+        name: email.split('@').first,
+        token: 'mock_token_${DateTime.now().millisecondsSinceEpoch}',
+        createdAt: DateTime.now(),
+      );
+      
+      return Right(mockUser);
+    } catch (e) {
+      return Left<Failure, UserModel>(
+        ServerFailure(message: 'Login failed: $e'),
+      );
+    }
+  }
+
+  @override
+  Future<Either<Failure, UserModel>> register(String email, String password, String? name) async {
+    try {
+      await Future<void>.delayed(const Duration(seconds: 1));
+      
+      final mockUser = UserModel(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        email: email,
+        name: name ?? email.split('@').first,
+        token: 'mock_token_${DateTime.now().millisecondsSinceEpoch}',
+        createdAt: DateTime.now(),
+      );
+      
+      return Right(mockUser);
+    } catch (e) {
+      return Left<Failure, UserModel>(
+        ServerFailure(message: 'Registration failed: $e'),
+      );
+    }
+  }
+}
+
+''';
+  static const String _features_auth_data_repositories_auth_repository_impl_dart = r'''import 'package:dartz/dartz.dart';
+import '../../../../core/errors/failures.dart';
+import '../datasources/remote/auth_remote_datasource.dart';
+import '../datasources/local/auth_local_datasource.dart';
+import '../../domain/repositories/auth_repository.dart';
+import '../../domain/entities/user_entity.dart';
+import '../models/user_model.dart';
+import '../../../../core/utils/secure_storage_utils.dart';
+
+class AuthRepositoryImpl implements AuthRepository {
+  const AuthRepositoryImpl({
+    required this.authRemoteDataSource,
+    required this.authLocalDataSource,
+    required this.secureStorageUtils,
+  });
+
+  final AuthRemoteDataSource authRemoteDataSource;
+  final AuthLocalDataSource authLocalDataSource;
+  final SecureStorageUtils secureStorageUtils;
+
+  @override
+  Future<Either<Failure, UserEntity>> login(String email, String password) async {
+    final Either<Failure, UserModel> result = await authRemoteDataSource.login(email, password);
+    return result.fold(
+      (Failure failure) => Left<Failure, UserEntity>(failure),
+      (UserModel model) async {
+        await authLocalDataSource.saveUser(model);
+        if (model.token != null) {
+          await secureStorageUtils.write('token', model.token!);
+        }
+        return Right(UserEntity.fromModel(model));
+      },
+    );
+  }
+
+  @override
+  Future<Either<Failure, UserEntity>> register(String email, String password, String? name) async {
+    final Either<Failure, UserModel> result = await authRemoteDataSource.register(email, password, name);
+    return result.fold(
+      (Failure failure) => Left<Failure, UserEntity>(failure),
+      (UserModel model) async {
+        await authLocalDataSource.saveUser(model);
+        if (model.token != null) {
+          await secureStorageUtils.write('token', model.token!);
+        }
+        return Right(UserEntity.fromModel(model));
+      },
+    );
+  }
+
+  @override
+  Future<Either<Failure, void>> logout() async {
+    try {
+      final token = await secureStorageUtils.read('token');
+      if (token != null) {
+        await secureStorageUtils.delete('token');
+      }
+      await authLocalDataSource.clearUsers();
+      return const Right(null);
+    } catch (e) {
+      return Left<Failure, void>(CacheFailure(message: 'Logout failed: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, UserEntity?>> getCurrentUser() async {
+    try {
+      final token = await secureStorageUtils.read('token');
+      if (token == null) {
+        return const Right(null);
+      }
+      
+      final Either<Failure, List<UserModel>> allUsers = await authLocalDataSource.getAllUsers();
+      return allUsers.fold(
+        (Failure failure) => Left<Failure, UserEntity?>(failure),
+        (List<UserModel> users) {
+          if (users.isEmpty) {
+            return const Right(null);
+          }
+          try {
+            final UserModel user = users.firstWhere(
+              (UserModel u) => u.token == token,
+            );
+            return Right(UserEntity.fromModel(user));
+          } catch (e) {
+            return const Right(null);
+          }
+        },
+      );
+    } catch (e) {
+      return Left<Failure, UserEntity?>(CacheFailure(message: 'Failed to get current user: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, bool>> isAuthenticated() async {
+    try {
+      final String? token = await secureStorageUtils.read('token');
+      return Right(token != null && token.isNotEmpty);
+    } catch (e) {
+      return Left<Failure, bool>(CacheFailure(message: 'Failed to check authentication: $e'));
+    }
+  }
+}
+
+''';
+  static const String _features_auth_data_models_user_model_dart = r'''import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'user_model.freezed.dart';
+part 'user_model.g.dart';
+
+@freezed
+abstract class UserModel with _$UserModel {
+  const factory UserModel({
+    required String id,
+    required String email,
+    String? name,
+    String? token,
+    DateTime? createdAt,
+  }) = _UserModel;
+
+  factory UserModel.fromJson(Map<String, dynamic> json) => _$UserModelFromJson(json);
+}
+
+''';
+  static const String _features_auth_domain_repositories_auth_repository_dart = r'''import 'package:dartz/dartz.dart';
+import '../../../../core/errors/failures.dart';
+import '../entities/user_entity.dart';
+
+abstract interface class AuthRepository {
+  Future<Either<Failure, UserEntity>> login(String email, String password);
+  Future<Either<Failure, UserEntity>> register(String email, String password, String? name);
+  Future<Either<Failure, void>> logout();
+  Future<Either<Failure, UserEntity?>> getCurrentUser();
+  Future<Either<Failure, bool>> isAuthenticated();
+}
+
+''';
+  static const String _features_auth_domain_use_cases_auth_use_cases_dart = r'''import 'package:dartz/dartz.dart';
+import '../repositories/auth_repository.dart';
+import '../entities/user_entity.dart';
+import '../../../../core/errors/failures.dart';
+
+class AuthUseCases {
+  const AuthUseCases({
+    required AuthRepository repository,
+  }) : _authRepository = repository;
+
+  final AuthRepository _authRepository;
+
+  Future<Either<Failure, UserEntity>> login(String email, String password) async {
+    return await _authRepository.login(email, password);
+  }
+
+  Future<Either<Failure, UserEntity>> register(String email, String password, String? name) async {
+    return await _authRepository.register(email, password, name);
+  }
+
+  Future<Either<Failure, void>> logout() async {
+    return await _authRepository.logout();
+  }
+
+  Future<Either<Failure, UserEntity?>> getCurrentUser() async {
+    return await _authRepository.getCurrentUser();
+  }
+
+  Future<Either<Failure, bool>> isAuthenticated() async {
+    return await _authRepository.isAuthenticated();
+  }
+}
+
+''';
+  static const String _features_auth_domain_entities_user_entity_dart = r'''import 'package:freezed_annotation/freezed_annotation.dart';
+import '../../data/models/user_model.dart';
+
+part 'user_entity.freezed.dart';
+part 'user_entity.g.dart';
+
+@freezed
+abstract class UserEntity with _$UserEntity {
+  const factory UserEntity({
+    required String id,
+    required String email,
+    String? name,
+    String? token,
+    DateTime? createdAt,
+  }) = _UserEntity;
+
+  factory UserEntity.fromJson(Map<String, dynamic> json) => _$UserEntityFromJson(json);
+
+  factory UserEntity.fromModel(UserModel model) => UserEntity(
+    id: model.id,
+    email: model.email,
+    name: model.name,
+    token: model.token,
+    createdAt: model.createdAt,
+  );
+}
+
+''';
+  static const String _features_auth_presentation_blocs_auth_bloc_auth_event_dart = r'''part of 'auth_bloc.dart';
+
+@freezed
+class AuthEvent with _$AuthEvent {
+  const factory AuthEvent.login(String email, String password) = _Login;
+  const factory AuthEvent.register(String email, String password, String? name) = _Register;
+  const factory AuthEvent.logout() = _Logout;
+  const factory AuthEvent.checkAuth() = _CheckAuth;
+}
+
+''';
+  static const String _features_auth_presentation_blocs_auth_bloc_auth_bloc_dart = r'''import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:hydrated_bloc/hydrated_bloc.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:dartz/dartz.dart';
+import '../../../../../core/errors/failures.dart';
+import '../../../domain/use_cases/auth_use_cases.dart';
+import '../../../domain/entities/user_entity.dart';
+
+part 'auth_bloc.freezed.dart';
+part 'auth_event.dart';
+part 'auth_state.dart';
+
+class AuthBloc extends HydratedBloc<AuthEvent, AuthState> {
+  final AuthUseCases _authUseCases;
+
+  AuthBloc({
+    required AuthUseCases authUseCases,
+  }) : _authUseCases = authUseCases,
+       super(const AuthState()) {
+    on<AuthEvent>((AuthEvent event, Emitter<AuthState> emit) async {
+      await event.map(
+        login: (e) async {
+          emit(state.copyWith(isLoading: true, failure: null));
+          final Either<Failure, UserEntity> result = await _authUseCases.login(e.email, e.password);
+          result.fold(
+            (Failure failure) => emit(
+              state.copyWith(failure: failure, isLoading: false, isAuthenticated: false),
+            ),
+            (UserEntity user) => emit(
+              state.copyWith(
+                user: user,
+                isLoading: false,
+                failure: null,
+                isAuthenticated: true,
+              ),
+            ),
+          );
+        },
+        register: (e) async {
+          emit(state.copyWith(isLoading: true, failure: null));
+          final Either<Failure, UserEntity> result = await _authUseCases.register(e.email, e.password, e.name);
+          result.fold(
+            (Failure failure) => emit(
+              state.copyWith(failure: failure, isLoading: false, isAuthenticated: false),
+            ),
+            (UserEntity user) => emit(
+              state.copyWith(
+                user: user,
+                isLoading: false,
+                failure: null,
+                isAuthenticated: true,
+              ),
+            ),
+          );
+        },
+        logout: (e) async {
+          emit(state.copyWith(isLoading: true, failure: null));
+          final Either<Failure, void> result = await _authUseCases.logout();
+          result.fold(
+            (Failure failure) => emit(
+              state.copyWith(failure: failure, isLoading: false),
+            ),
+            (_) => emit(
+              state.copyWith(
+                user: null,
+                isLoading: false,
+                failure: null,
+                isAuthenticated: false,
+              ),
+            ),
+          );
+        },
+        checkAuth: (e) async {
+          emit(state.copyWith(isLoading: true, failure: null));
+          final Either<Failure, bool> result = await _authUseCases.isAuthenticated();
+          result.fold(
+            (Failure failure) => emit(
+              state.copyWith(failure: failure, isLoading: false, isAuthenticated: false),
+            ),
+            (bool isAuth) async {
+              if (isAuth) {
+                final Either<Failure, UserEntity?> userResult = await _authUseCases.getCurrentUser();
+                userResult.fold(
+                  (Failure failure) => emit(
+                    state.copyWith(failure: failure, isLoading: false, isAuthenticated: false),
+                  ),
+                  (UserEntity? user) => emit(
+                    state.copyWith(
+                      user: user,
+                      isLoading: false,
+                      failure: null,
+                      isAuthenticated: user != null,
+                    ),
+                  ),
+                );
+              } else {
+                emit(state.copyWith(isLoading: false, isAuthenticated: false));
+              }
+            },
+          );
+        },
+      );
+    });
+  }
+
+  @override
+  AuthState? fromJson(Map<String, dynamic> json) => null;
+
+  @override
+  Map<String, dynamic>? toJson(AuthState state) => null;
+}
+
+''';
+  static const String _features_auth_presentation_blocs_auth_bloc_auth_state_dart = r'''part of 'auth_bloc.dart';
+
+@freezed
+abstract class AuthState with _$AuthState {
+  const factory AuthState({
+    @Default(false) bool isLoading,
+    @Default(false) bool isAuthenticated,
+    UserEntity? user,
+    Failure? failure,
+  }) = _AuthState;
+}
+
+''';
+  static const String _features_auth_presentation_pages_login_page_dart = r'''import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_form_builder/flutter_form_builder.dart';
+import 'package:form_builder_validators/form_builder_validators.dart';
+import 'package:go_router/go_router.dart';
+import '../blocs/auth_bloc/auth_bloc.dart';
+import '../../../../application/injector.dart';
+import '../../../../application/routes/routes.dart';
+
+class LoginPage extends StatelessWidget {
+  const LoginPage({super.key});
+  
+  @override
+  Widget build(BuildContext context) {
+    final formKey = GlobalKey<FormBuilderState>();
+
+    return BlocProvider(
+      create: (context) => Injector.get<AuthBloc>()..add(const AuthEvent.checkAuth()),
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Login'),
+        ),
+        body: BlocConsumer<AuthBloc, AuthState>(
+          listener: (context, state) {
+            if (state.isAuthenticated && state.user != null) {
+              context.go(Routes.home);
+            }
+            if (state.failure != null) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(state.failure!.message),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          },
+          builder: (context, state) {
+            return SingleChildScrollView(
+              padding: const EdgeInsets.all(16.0),
+              child: FormBuilder(
+                key: formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SizedBox(height: 32),
+                    const Text(
+                      'Welcome Back',
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Please sign in to continue',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 48),
+                    FormBuilderTextField(
+                      name: 'email',
+                      decoration: const InputDecoration(
+                        labelText: 'Email',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.email),
+                      ),
+                      keyboardType: TextInputType.emailAddress,
+                      validator: FormBuilderValidators.compose([
+                        FormBuilderValidators.required(),
+                        FormBuilderValidators.email(),
+                      ]),
+                    ),
+                    const SizedBox(height: 16),
+                    FormBuilderTextField(
+                      name: 'password',
+                      decoration: const InputDecoration(
+                        labelText: 'Password',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.lock),
+                      ),
+                      obscureText: true,
+                      validator: FormBuilderValidators.compose([
+                        FormBuilderValidators.required(),
+                        FormBuilderValidators.minLength(6),
+                      ]),
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: state.isLoading
+                          ? null
+                          : () {
+                              if (formKey.currentState?.saveAndValidate() ?? false) {
+                                final email = formKey.currentState?.value['email'] as String;
+                                final password = formKey.currentState?.value['password'] as String;
+                                context.read<AuthBloc>().add(
+                                      AuthEvent.login(email, password),
+                                    );
+                              }
+                            },
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      child: state.isLoading
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('Login'),
+                    ),
+                    const SizedBox(height: 16),
+                    TextButton(
+                      onPressed: () {
+                        // Navigate to register page if needed
+                      },
+                      child: const Text('Don\'t have an account? Register'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+''';
   static const String _shared_shared_dart = r'''export 'pages/server_unavailable_page.dart';
 export 'widgets/widgets.dart';
 
@@ -790,6 +1485,7 @@ import 'package:hydrated_bloc/hydrated_bloc.dart';
 import 'application/application.dart';
 import 'application/injector.dart';
 import 'features/home/presentation/blocs/home_bloc/home_bloc.dart';
+import 'features/auth/presentation/blocs/auth_bloc/auth_bloc.dart';
 import 'core/services/talker_service.dart';
 
 Future<void> main() async {
@@ -826,6 +1522,9 @@ Future<void> runMainApp() async {
   runApp(
     MultiBlocProvider(
       providers: <SingleChildWidget>[
+        BlocProvider<AuthBloc>(
+          create: (BuildContext _) => Injector.get<AuthBloc>(),
+        ),
         BlocProvider<HomeBloc>(
           create: (BuildContext _) => Injector.get<HomeBloc>(),
         ),
@@ -894,11 +1593,18 @@ class AppLocalizationsSetup {
   static const String _application_injector_dart = r'''import 'package:get_it/get_it.dart';
 import '../core/network/http_client.dart';
 import '../core/utils/secure_storage_utils.dart';
+import '../core/database/app_database.dart';
 import '../features/home/domain/repositories/home_repository.dart';
 import '../features/home/domain/use_cases/home_use_cases.dart';
 import '../features/home/presentation/blocs/home_bloc/home_bloc.dart';
 import '../features/home/data/repositories/home_repository_impl.dart';
 import '../features/home/data/datasources/remote/home_remote_datasource.dart';
+import '../features/auth/domain/repositories/auth_repository.dart';
+import '../features/auth/domain/use_cases/auth_use_cases.dart';
+import '../features/auth/presentation/blocs/auth_bloc/auth_bloc.dart';
+import '../features/auth/data/repositories/auth_repository_impl.dart';
+import '../features/auth/data/datasources/remote/auth_remote_datasource.dart';
+import '../features/auth/data/datasources/local/auth_local_datasource.dart';
 
 class Injector {
   Injector._();
@@ -938,11 +1644,17 @@ class Injector {
     registerLazySingleton<SecureStorageUtils>(
       () => SecureStorageUtils(),
     );
+    registerLazySingleton<AppDatabase>(
+      () => AppDatabase(),
+    );
   }
 
   static void _registerUseCases() {
     registerLazySingleton<HomeUseCases>(
       () => HomeUseCases(repository: get<HomeRepository>()),
+    );
+    registerLazySingleton<AuthUseCases>(
+      () => AuthUseCases(repository: get<AuthRepository>()),
     );
   }
 
@@ -950,17 +1662,33 @@ class Injector {
     registerLazySingleton<HomeRepository>(
       () => HomeRepositoryImpl(homeRemoteDataSource: get<HomeRemoteDataSource>()),
     );
+    registerLazySingleton<AuthRepository>(
+      () => AuthRepositoryImpl(
+        authRemoteDataSource: get<AuthRemoteDataSource>(),
+        authLocalDataSource: get<AuthLocalDataSource>(),
+        secureStorageUtils: get<SecureStorageUtils>(),
+      ),
+    );
   }
 
   static void _registerDataSources() {
     registerLazySingleton<HomeRemoteDataSource>(
       () => HomeRemoteDataSourceImpl(),
     );
+    registerLazySingleton<AuthRemoteDataSource>(
+      () => AuthRemoteDataSourceImpl(),
+    );
+    registerLazySingleton<AuthLocalDataSource>(
+      () => AuthLocalDataSourceImpl(database: get<AppDatabase>()),
+    );
   }
 
   static void _registerBlocs() {
     registerLazySingleton<HomeBloc>(
       () => HomeBloc(homeUseCases: get<HomeUseCases>()),
+    );
+    registerLazySingleton<AuthBloc>(
+      () => AuthBloc(authUseCases: get<AuthUseCases>()),
     );
   }
 }
@@ -1007,9 +1735,11 @@ class AppTheme {
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/home/presentation/pages/home_page.dart';
+import '../../features/auth/presentation/pages/login_page.dart';
 
 class Routes {
   const Routes._();
+  static const String login = '/login';
   static const String home = '/home';
 }
 
@@ -1031,8 +1761,12 @@ class AppRoutes {
     },
     navigatorKey: _navigatorKey,
     debugLogDiagnostics: true,
-    initialLocation: Routes.home,
+    initialLocation: Routes.login,
     routes: <RouteBase>[
+      GoRoute(
+        path: Routes.login,
+        builder: (BuildContext context, GoRouterState state) => const LoginPage(),
+      ),
       GoRoute(
         path: Routes.home,
         builder: (BuildContext context, GoRouterState state) => const HomePage(),
@@ -1044,6 +1778,7 @@ class AppRoutes {
 ''';
 
   static Map<String, String> get templates => {
+    'core/database/app_database.dart': _core_database_app_database_dart,
     'core/core.dart': _core_core_dart,
     'core/network/http_client.dart': _core_network_http_client_dart,
     'core/enums/server_status.dart': _core_enums_server_status_dart,
@@ -1064,6 +1799,17 @@ class AppRoutes {
     'features/home/presentation/blocs/home_bloc/home_bloc.dart': _features_home_presentation_blocs_home_bloc_home_bloc_dart,
     'features/home/presentation/blocs/home_bloc/home_event.dart': _features_home_presentation_blocs_home_bloc_home_event_dart,
     'features/home/presentation/pages/home_page.dart': _features_home_presentation_pages_home_page_dart,
+    'features/auth/data/datasources/local/auth_local_datasource.dart': _features_auth_data_datasources_local_auth_local_datasource_dart,
+    'features/auth/data/datasources/remote/auth_remote_datasource.dart': _features_auth_data_datasources_remote_auth_remote_datasource_dart,
+    'features/auth/data/repositories/auth_repository_impl.dart': _features_auth_data_repositories_auth_repository_impl_dart,
+    'features/auth/data/models/user_model.dart': _features_auth_data_models_user_model_dart,
+    'features/auth/domain/repositories/auth_repository.dart': _features_auth_domain_repositories_auth_repository_dart,
+    'features/auth/domain/use_cases/auth_use_cases.dart': _features_auth_domain_use_cases_auth_use_cases_dart,
+    'features/auth/domain/entities/user_entity.dart': _features_auth_domain_entities_user_entity_dart,
+    'features/auth/presentation/blocs/auth_bloc/auth_event.dart': _features_auth_presentation_blocs_auth_bloc_auth_event_dart,
+    'features/auth/presentation/blocs/auth_bloc/auth_bloc.dart': _features_auth_presentation_blocs_auth_bloc_auth_bloc_dart,
+    'features/auth/presentation/blocs/auth_bloc/auth_state.dart': _features_auth_presentation_blocs_auth_bloc_auth_state_dart,
+    'features/auth/presentation/pages/login_page.dart': _features_auth_presentation_pages_login_page_dart,
     'shared/shared.dart': _shared_shared_dart,
     'shared/pages/server_unavailable_page.dart': _shared_pages_server_unavailable_page_dart,
     'shared/widgets/widgets.dart': _shared_widgets_widgets_dart,

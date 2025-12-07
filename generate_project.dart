@@ -13,7 +13,7 @@ void main() async {
   );
 
   final projectPath = '/Users/victorsdd/desktop';
-  final projectName = 'test_project';
+  final projectName = 'test_auth_project';
   
   print('📁 Working directory: ${Directory.current.path}');
   print('📁 Target path: $projectPath');
@@ -37,10 +37,44 @@ void main() async {
 
   try {
     print('🚀 Generating project...');
+    print('📋 Config:');
+    print('   - Name: ${config.projectName}');
+    print('   - Organization: ${config.organizationName}');
+    print('   - Platforms: ${config.platforms}');
+    print('   - Architecture: ${config.architecture}');
+    print('   - State Management: ${config.stateManagement}');
+    print('');
+    
     await projectRepository.createProject(config);
+    
     print('');
     print('✅ Project generated successfully!');
     print('📁 Location: $projectPath/$projectName');
+    
+    final projectDir = Directory('$projectPath/$projectName');
+    if (await projectDir.exists()) {
+      print('✅ Project directory exists');
+      final libDir = Directory('$projectPath/$projectName/lib');
+      if (await libDir.exists()) {
+        print('✅ lib directory exists');
+        final authDir = Directory('$projectPath/$projectName/lib/features/auth');
+        if (await authDir.exists()) {
+          print('✅ Auth feature directory exists');
+        } else {
+          print('⚠️  Auth feature directory NOT found');
+        }
+        final dbFile = File('$projectPath/$projectName/lib/core/database/app_database.dart');
+        if (await dbFile.exists()) {
+          print('✅ Database file exists');
+        } else {
+          print('⚠️  Database file NOT found');
+        }
+      } else {
+        print('⚠️  lib directory NOT found');
+      }
+    } else {
+      print('❌ Project directory NOT found!');
+    }
   } catch (e, stackTrace) {
     print('');
     print('❌ Error: $e');

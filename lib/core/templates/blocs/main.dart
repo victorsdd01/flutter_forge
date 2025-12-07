@@ -8,6 +8,7 @@ import 'package:hydrated_bloc/hydrated_bloc.dart';
 import 'application/application.dart';
 import 'application/injector.dart';
 import 'features/home/presentation/blocs/home_bloc/home_bloc.dart';
+import 'features/auth/presentation/blocs/auth_bloc/auth_bloc.dart';
 import 'core/services/talker_service.dart';
 
 Future<void> main() async {
@@ -44,6 +45,9 @@ Future<void> runMainApp() async {
   runApp(
     MultiBlocProvider(
       providers: <SingleChildWidget>[
+        BlocProvider<AuthBloc>(
+          create: (BuildContext _) => Injector.get<AuthBloc>(),
+        ),
         BlocProvider<HomeBloc>(
           create: (BuildContext _) => Injector.get<HomeBloc>(),
         ),

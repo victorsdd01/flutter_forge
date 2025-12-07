@@ -57,6 +57,8 @@ class FileSystemDataSourceImpl implements FileSystemDataSource {
           'talker_flutter: ^5.0.2',
           'flutter_form_builder: ^10.2.0',
           'form_builder_validators: ^11.2.0',
+          'drift: ^2.18.0',
+          'sqlite3_flutter_libs: ^0.5.20',
         ]);
         
         if (includeFreezed) {
@@ -121,6 +123,13 @@ class FileSystemDataSourceImpl implements FileSystemDataSource {
       devDependencies.addAll([
         'json_serializable: ^6.9.5',
         'build_runner: ^2.5.1',
+      ]);
+    }
+
+    // Add Drift dev dependencies for BLoC
+    if (stateManagement == StateManagementType.bloc) {
+      devDependencies.addAll([
+        'drift_dev: ^2.18.0',
       ]);
     }
 

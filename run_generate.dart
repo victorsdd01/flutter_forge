@@ -81,4 +81,3 @@ String _toVarName(String path) {
       .replaceAll(' ', '_');
 }
 
-

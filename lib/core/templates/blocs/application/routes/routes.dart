@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/home/presentation/pages/home_page.dart';
+import '../../features/auth/presentation/pages/login_page.dart';
 
 class Routes {
   const Routes._();
+  static const String login = '/login';
   static const String home = '/home';
 }
 
@@ -26,8 +28,12 @@ class AppRoutes {
     },
     navigatorKey: _navigatorKey,
     debugLogDiagnostics: true,
-    initialLocation: Routes.home,
+    initialLocation: Routes.login,
     routes: <RouteBase>[
+      GoRoute(
+        path: Routes.login,
+        builder: (BuildContext context, GoRouterState state) => const LoginPage(),
+      ),
       GoRoute(
         path: Routes.home,
         builder: (BuildContext context, GoRouterState state) => const HomePage(),
