@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutterforge/core/templates/template_generator.dart';
 import 'package:path/path.dart' as path;
 import '../../domain/entities/project_config.dart';
 
@@ -8,7 +9,8 @@ abstract class FileSystemDataSource {
   Future<void> createDirectoryStructure(String projectName, StateManagementType stateManagement, bool includeGoRouter);
   Future<void> createStateManagementTemplates(String projectName, StateManagementType stateManagement, bool includeFreezed);
   Future<void> createGoRouterTemplates(String projectName);
-  Future<void> createCleanArchitectureStructure(String projectName, StateManagementType stateManagement, {bool includeGoRouter = false, bool includeFreezed = false});
+  Future<void> createDefaultNavigationTemplates(String projectName);
+  Future<void> createCleanArchitectureStructure(String projectName, StateManagementType stateManagement, ArchitectureType architecture, {bool includeGoRouter = false, bool includeFreezed = false});
   Future<void> updateMainFile(String projectName, StateManagementType stateManagement, bool includeGoRouter, bool includeCleanArchitecture, bool includeFreezed);
   Future<void> createLinterRules(String projectName);
   Future<void> createBarrelFiles(String projectName, StateManagementType stateManagement, bool includeCleanArchitecture, bool includeFreezed);
@@ -18,6 +20,8 @@ abstract class FileSystemDataSource {
 
 /// Implementation of FileSystemDataSource
 class FileSystemDataSourceImpl implements FileSystemDataSource {
+
+  final TemplateGenerator templateGenerator = TemplateGenerator.instance;
   @override
   Future<void> addDependencies(String projectName, StateManagementType stateManagement, bool includeGoRouter, bool includeCleanArchitecture, bool includeFreezed) async {
     final pubspecPath = path.join(projectName, 'pubspec.yaml');
@@ -54,22 +58,27 @@ class FileSystemDataSourceImpl implements FileSystemDataSource {
           ]);
         }
         break;
-      case StateManagementType.cubit:
-        dependencies.addAll([
-          'flutter_bloc: ^9.1.1',
-          'hydrated_bloc: ^10.1.1',
-          'equatable: ^2.0.7',
-          'get_it: ^8.0.3',
-        ]);
-        break;
       case StateManagementType.provider:
         dependencies.addAll([
           'provider: ^6.1.5',
           'get_it: ^8.0.3',
         ]);
+        
+        // Always add Freezed for non-BLoC state management
+        dependencies.addAll([
+          'json_annotation: ^4.9.0',
+          'freezed_annotation: ^2.4.4',
+          'freezed: ^2.5.7',
+        ]);
         break;
       case StateManagementType.none:
-        break; // No state management dependencies
+        // Always add Freezed for non-BLoC state management
+        dependencies.addAll([
+          'json_annotation: ^4.9.0',
+          'freezed_annotation: ^2.4.4',
+          'freezed: ^2.5.7',
+        ]);
+        break;
     }
 
     // Add Go Router dependency if requested
@@ -77,13 +86,15 @@ class FileSystemDataSourceImpl implements FileSystemDataSource {
       dependencies.add('go_router: ^16.0.0');
     }
 
+    // Always add get_it for dependency injection
+    if (!dependencies.any((d) => d.startsWith('get_it:'))) {
+      dependencies.add('get_it: ^8.0.3');
+    }
+
     // Add Clean Architecture dependencies if requested
     if (includeCleanArchitecture) {
       if (!dependencies.any((d) => d.startsWith('equatable:'))) {
         dependencies.add('equatable: ^2.0.7');
-      }
-      if (!dependencies.any((d) => d.startsWith('get_it:'))) {
-        dependencies.add('get_it: ^8.0.3');
       }
     }
 
@@ -97,7 +108,8 @@ class FileSystemDataSourceImpl implements FileSystemDataSource {
     // Build dev dependencies list
     final devDependencies = <String>[];
     
-    if (includeFreezed) {
+    // Always add Freezed dev dependencies for Provider/None or when Freezed is selected
+    if (includeFreezed || stateManagement == StateManagementType.provider || stateManagement == StateManagementType.none) {
       devDependencies.addAll([
         'json_serializable: ^6.8.0',
         'build_runner: ^2.4.13',
@@ -194,15 +206,15 @@ flutter_intl:
 
   @override
   Future<void> createStateManagementTemplates(String projectName, StateManagementType stateManagement, bool includeFreezed) async {
+    // This method is only called for Clean Architecture
+    // MVVM templates are created in _createMvvmStructure
     switch (stateManagement) {
       case StateManagementType.bloc:
         await _createBlocTemplates(projectName, includeFreezed);
         break;
-      case StateManagementType.cubit:
-        await _createCubitTemplates(projectName);
-        break;
       case StateManagementType.provider:
-        await _createProviderTemplates(projectName);
+        // Provider should not be in Clean Architecture
+        // It should use MVVM instead
         break;
       case StateManagementType.none:
         break;
@@ -227,7 +239,7 @@ flutter_intl:
       pagesPath = 'lib/pages';
     }
 
-    // Create sample pages
+    // Create sample pages with Go Router navigation
     final homePageFile = File(path.join(projectName, '$pagesPath/home_page.dart'));
     homePageFile.writeAsStringSync(_generateHomePageContent());
 
@@ -236,6 +248,35 @@ flutter_intl:
 
     final settingsPageFile = File(path.join(projectName, '$pagesPath/settings_page.dart'));
     settingsPageFile.writeAsStringSync(_generateSettingsPageContent());
+  }
+
+  @override
+  Future<void> createDefaultNavigationTemplates(String projectName) async {
+    // Check if Clean Architecture structure exists to determine page location
+    final cleanArchPagesDir = Directory(path.join(projectName, 'lib/presentation/pages'));
+    
+    String pagesPath;
+    if (cleanArchPagesDir.existsSync()) {
+      // Clean Architecture structure exists, use presentation/pages
+      pagesPath = 'lib/presentation/pages';
+    } else {
+      // Regular structure, use pages
+      pagesPath = 'lib/pages';
+    }
+
+    // Create directory if it doesn't exist
+    final pagesDir = Directory(path.join(projectName, pagesPath));
+    pagesDir.createSync(recursive: true);
+
+    // Create sample pages with default navigation
+    final homePageFile = File(path.join(projectName, '$pagesPath/home_page.dart'));
+    homePageFile.writeAsStringSync(_generateDefaultHomePageContent());
+
+    final aboutPageFile = File(path.join(projectName, '$pagesPath/about_page.dart'));
+    aboutPageFile.writeAsStringSync(_generateDefaultAboutPageContent());
+
+    final settingsPageFile = File(path.join(projectName, '$pagesPath/settings_page.dart'));
+    settingsPageFile.writeAsStringSync(_generateDefaultSettingsPageContent());
   }
 
 
@@ -257,6 +298,9 @@ flutter_intl:
 
   Future<void> _createBlocTemplates(String projectName, bool includeFreezed) async {
     final blocDir = path.join(projectName, 'lib/presentation/blocs');
+    
+    // Create directory if it doesn't exist
+    Directory(blocDir).createSync(recursive: true);
     
     if (includeFreezed) {
       // Create Freezed BLoC files
@@ -281,25 +325,6 @@ flutter_intl:
     }
   }
 
-  Future<void> _createCubitTemplates(String projectName) async {
-    final cubitDir = path.join(projectName, 'lib/presentation/cubits');
-    
-    // Create state file
-    final stateFile = File(path.join(cubitDir, 'counter_state.dart'));
-    stateFile.writeAsStringSync(_generateCubitStateContent());
-
-    // Create cubit file
-    final cubitFile = File(path.join(cubitDir, 'counter_cubit.dart'));
-    cubitFile.writeAsStringSync(_generateCubitContent());
-  }
-
-  Future<void> _createProviderTemplates(String projectName) async {
-    final providerDir = path.join(projectName, 'lib/presentation/providers');
-    
-    // Create provider file
-    final providerFile = File(path.join(providerDir, 'counter_provider.dart'));
-    providerFile.writeAsStringSync(_generateProviderContent());
-  }
 
   String _generateBlocEventContent() {
     return '''
@@ -407,152 +432,40 @@ class CounterBloc extends HydratedBloc<CounterEvent, CounterState> {
 ''';
   }
 
-  String _generateCubitStateContent() {
-    return '''
-import 'package:equatable/equatable.dart';
-
-class CounterState extends Equatable {
-  final int count;
-  final String status;
-  
-  const CounterState({
-    this.count = 0,
-    this.status = 'initial',
-  });
-  
-  CounterState copyWith({
-    int? count,
-    String? status,
-  }) {
-    return CounterState(
-      count: count ?? this.count,
-      status: status ?? this.status,
-    );
-  }
-  
-  @override
-  List<Object> get props => [count, status];
-}
-''';
-  }
-
-  String _generateCubitContent() {
-    return '''
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:hydrated_bloc/hydrated_bloc.dart';
-import 'counter_state.dart';
-
-class CounterCubit extends HydratedCubit<CounterState> {
-  CounterCubit() : super(const CounterState());
-
-  void increment() {
-    emit(state.copyWith(
-      count: state.count + 1,
-      status: 'incremented',
-    ));
-  }
-
-  void decrement() {
-    emit(state.copyWith(
-      count: state.count - 1,
-      status: 'decremented',
-    ));
-  }
-
-  void reset() {
-    emit(const CounterState());
-  }
-
-  @override
-  CounterState? fromJson(Map<String, dynamic> json) {
-    return CounterState(
-      count: json['count'] as int? ?? 0,
-      status: json['status'] as String? ?? 'initial',
-    );
-  }
-
-  @override
-  Map<String, dynamic>? toJson(CounterState state) {
-    return {
-      'count': state.count,
-      'status': state.status,
-    };
-  }
-}
-''';
-  }
-
-  String _generateProviderContent() {
-    return '''
-import 'package:flutter/foundation.dart';
-
-class CounterProvider with ChangeNotifier {
-  int _count = 0;
-  
-  int get count => _count;
-  
-  void increment() {
-    _count++;
-    notifyListeners();
-  }
-  
-  void decrement() {
-    _count--;
-    notifyListeners();
-  }
-  
-  void reset() {
-    _count = 0;
-    notifyListeners();
-  }
-}
-''';
-  }
-
   String _generateMainContent(StateManagementType stateManagement, bool includeGoRouter, bool includeCleanArchitecture, bool includeFreezed) {
-    // Generate the complete main.dart content based on all options
-    if (stateManagement == StateManagementType.bloc && includeFreezed && includeGoRouter && includeCleanArchitecture) {
-      return _generateFreezedBlocWithGoRouterAndCleanArchitecture();
-    } else if (stateManagement == StateManagementType.bloc && includeFreezed && includeCleanArchitecture) {
-      return _generateFreezedBlocWithCleanArchitecture();
-    } else if (stateManagement == StateManagementType.bloc && includeFreezed && includeGoRouter) {
-      return _generateFreezedBlocWithGoRouter();
-    } else if (stateManagement == StateManagementType.bloc && includeFreezed) {
-      return _generateBlocMainContent(includeFreezed);
-    } else if (stateManagement == StateManagementType.bloc && includeGoRouter) {
-      return _generateBlocWithGoRouter(includeFreezed);
-    } else if (stateManagement == StateManagementType.cubit && includeGoRouter) {
-      return _generateCubitWithGoRouter();
+    // Determine architecture type based on state management
+    final isCleanArchitecture = stateManagement == StateManagementType.bloc;
+    
+    if (isCleanArchitecture) {
+      // Generate BLoC with Clean Architecture
+      if (includeFreezed && includeGoRouter && includeCleanArchitecture) {
+        return _generateFreezedBlocWithGoRouterAndCleanArchitecture();
+      } else if (includeFreezed && includeCleanArchitecture) {
+        return _generateFreezedBlocWithCleanArchitecture();
+      } else if (includeFreezed && includeGoRouter) {
+        return _generateFreezedBlocWithGoRouter();
+      } else if (includeFreezed) {
+        return _generateBlocMainContent(includeFreezed);
+      } else if (includeGoRouter) {
+        return _generateBlocWithGoRouter(includeFreezed);
+      } else {
+        String baseContent = _generateBlocMainContent(includeFreezed);
+        
+        // Add Clean Architecture integration if requested
+        if (includeCleanArchitecture) {
+          baseContent = _integrateCleanArchitecture(baseContent, stateManagement);
+        }
+
+        // Add Go Router integration if requested
+        if (includeGoRouter) {
+          baseContent = _integrateGoRouter(baseContent);
+        }
+
+        return baseContent;
+      }
     } else {
-      // Fallback to the original approach for other combinations
-      String baseContent;
-      
-      switch (stateManagement) {
-        case StateManagementType.bloc:
-          baseContent = _generateBlocMainContent(includeFreezed);
-          break;
-        case StateManagementType.cubit:
-          baseContent = _generateCubitMainContent();
-          break;
-        case StateManagementType.provider:
-          baseContent = _generateProviderMainContent();
-          break;
-        case StateManagementType.none:
-          baseContent = _generateBasicMainContent();
-          break;
-      }
-
-      // Add Clean Architecture integration if requested
-      if (includeCleanArchitecture) {
-        baseContent = _integrateCleanArchitecture(baseContent, stateManagement);
-      }
-
-      // Add Go Router integration if requested (after Clean Architecture)
-      if (includeGoRouter) {
-        baseContent = _integrateGoRouter(baseContent);
-      }
-
-      return baseContent;
+      // Generate MVVM architecture for non-BLoC state management
+      return _generateMvvmMainContent(stateManagement, includeGoRouter, includeFreezed);
     }
   }
 
@@ -899,6 +812,214 @@ class _SettingsPageState extends State<SettingsPage> {
 ''';
   }
 
+  String _generateDefaultHomePageContent() {
+    return '''
+import 'package:flutter/material.dart';
+import 'about_page.dart';
+import 'settings_page.dart';
+
+class HomePage extends StatelessWidget {
+  const HomePage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Home'),
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SettingsPage()),
+              );
+            },
+          ),
+        ],
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text(
+              'Welcome to Your Flutter App!',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'This is your home page with default navigation.',
+              style: TextStyle(fontSize: 16),
+            ),
+            const SizedBox(height: 30),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const AboutPage()),
+                    );
+                  },
+                  child: const Text('About'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const SettingsPage()),
+                    );
+                  },
+                  child: const Text('Settings'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+''';
+  }
+
+  String _generateDefaultAboutPageContent() {
+    return '''
+import 'package:flutter/material.dart';
+
+class AboutPage extends StatelessWidget {
+  const AboutPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('About'),
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: const Padding(
+        padding: EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'About This App',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 20),
+            Text(
+              'This is a Flutter application created with VMGV CLI.',
+              style: TextStyle(fontSize: 16),
+            ),
+            SizedBox(height: 10),
+            Text(
+              'Features:',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 10),
+            Text('• Default navigation with Navigator'),
+            Text('• Clean architecture'),
+            Text('• State management'),
+            Text('• Best practices'),
+          ],
+        ),
+      ),
+    );
+  }
+}
+''';
+  }
+
+  String _generateDefaultSettingsPageContent() {
+    return '''
+import 'package:flutter/material.dart';
+
+class SettingsPage extends StatefulWidget {
+  const SettingsPage({super.key});
+
+  @override
+  State<SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends State<SettingsPage> {
+  bool _darkMode = false;
+  bool _notifications = true;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Settings'),
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Settings',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 20),
+            SwitchListTile(
+              title: const Text('Dark Mode'),
+              subtitle: const Text('Enable dark theme'),
+              value: _darkMode,
+              onChanged: (value) {
+                setState(() {
+                  _darkMode = value;
+                });
+              },
+            ),
+            SwitchListTile(
+              title: const Text('Notifications'),
+              subtitle: const Text('Enable push notifications'),
+              value: _notifications,
+              onChanged: (value) {
+                setState(() {
+                  _notifications = value;
+                });
+              },
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Navigation',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 10),
+            ListTile(
+              leading: const Icon(Icons.home),
+              title: const Text('Go to Home'),
+              onTap: () => Navigator.pop(context),
+            ),
+            ListTile(
+              leading: const Icon(Icons.info),
+              title: const Text('Go to About'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/about');
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+''';
+  }
+
   String _generateFreezedBlocWithGoRouterAndCleanArchitecture() {
     return '''
 import 'package:flutter/material.dart';
@@ -925,7 +1046,7 @@ Future<void> runMainApp() async {
   Injector.init();
 
   runApp(MultiBlocProvider(
-      providers: <SingleChildWidget>[
+      providers: [
         BlocProvider<SampleBloc>(
           create: (BuildContext _) => Injector.get<SampleBloc>(),
         ),
@@ -956,6 +1077,44 @@ class MyApp extends StatelessWidget {
       reverseCurve: Curves.easeInOut,
       reverseDuration: const Duration(milliseconds: 300),
     ),
+  );
+}
+''';
+  }
+
+  String _generateFreezedBlocWithGoRouter() {
+    return '''
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:go_router/go_router.dart';
+import 'presentation/blocs/main_bloc.dart';
+import 'routes/app_router.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  runApp(MultiBlocProvider(
+    providers: [
+      BlocProvider<MainBloc>(
+        create: (context) => MainBloc(),
+      ),
+    ],
+    child: const MyApp(),
+  ));
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) => MaterialApp.router(
+    title: 'Flutter App',
+    theme: ThemeData(
+      colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+      useMaterial3: true,
+    ),
+    routerConfig: AppRouter.router,
   );
 }
 ''';
@@ -986,7 +1145,7 @@ Future<void> runMainApp() async {
   Injector.init();
 
   runApp(MultiBlocProvider(
-      providers: <SingleChildWidget>[
+      providers: [
         BlocProvider<SampleBloc>(
           create: (BuildContext _) => Injector.get<SampleBloc>(),
         ),
@@ -1014,67 +1173,6 @@ class MyApp extends StatelessWidget {
 ''';
   }
 
-  String _generateFreezedBlocWithGoRouter() {
-    return '''
-import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:hydrated_bloc/hydrated_bloc.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:flutter/foundation.dart';
-import 'core/di/dependency_injection.dart';
-import 'presentation/blocs/sample_bloc.dart';
-import 'routes/app_router.dart';
-import 'application/generated/l10n/app_localizations.dart';
-
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await runMainApp();
-}
-
-Future<void> runMainApp() async {
-  HydratedBloc.storage = await HydratedStorage.build(
-    storageDirectory: kIsWeb
-        ? HydratedStorageDirectory.web
-        : HydratedStorageDirectory((await getTemporaryDirectory()).path),
-  );
-  Injector.init();
-
-  runApp(MultiBlocProvider(
-      providers: <SingleChildWidget>[
-        BlocProvider<SampleBloc>(
-          create: (BuildContext _) => Injector.get<SampleBloc>(),
-        ),
-      ],
-      child: const MyApp()
-    )
-  );
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) => MaterialApp.router(
-    theme: ThemeData(
-      colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-      useMaterial3: true,
-    ),
-    routerConfig: AppRouter.router,
-    localizationsDelegates: AppLocalizationsSetup.localizationsDelegates,
-    supportedLocales: AppLocalizationsSetup.supportedLocales,
-    debugShowCheckedModeBanner: kDebugMode,
-    themeAnimationCurve: Curves.easeInOut,
-    themeAnimationDuration: const Duration(milliseconds: 300),
-    themeAnimationStyle: AnimationStyle(
-      curve: Curves.easeInOut,
-      duration: const Duration(milliseconds: 300),
-      reverseCurve: Curves.easeInOut,
-      reverseDuration: const Duration(milliseconds: 300),
-    ),
-  );
-}
-''';
-  }
 
   String _generateBlocWithGoRouter(bool includeFreezed) {
     return '''
@@ -1100,7 +1198,7 @@ Future<void> runMainApp() async {
   );
 
   runApp(MultiBlocProvider(
-      providers: <SingleChildWidget>[
+      providers: [
         BlocProvider<CounterBloc>(
           create: (BuildContext _) => CounterBloc(),
         ),
@@ -1108,66 +1206,6 @@ Future<void> runMainApp() async {
       child: const MyApp()
     )
   );
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) => MaterialApp.router(
-    theme: ThemeData(
-      colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-      useMaterial3: true,
-    ),
-    routerConfig: AppRouter.router,
-    localizationsDelegates: AppLocalizationsSetup.localizationsDelegates,
-    supportedLocales: AppLocalizationsSetup.supportedLocales,
-    debugShowCheckedModeBanner: kDebugMode,
-    themeAnimationCurve: Curves.easeInOut,
-    themeAnimationDuration: const Duration(milliseconds: 300),
-    themeAnimationStyle: AnimationStyle(
-      curve: Curves.easeInOut,
-      duration: const Duration(milliseconds: 300),
-      reverseCurve: Curves.easeInOut,
-      reverseDuration: const Duration(milliseconds: 300),
-    ),
-  );
-}
-''';
-  }
-
-  String _generateCubitWithGoRouter() {
-    return '''
-import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:hydrated_bloc/hydrated_bloc.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:flutter/foundation.dart';
-import 'presentation/cubits/counter_cubit.dart';
-import 'presentation/cubits/counter_state.dart';
-import 'routes/app_router.dart';
-import 'application/generated/l10n/app_localizations.dart';
-
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await runMainApp();
-}
-
-Future<void> runMainApp() async {
-  HydratedBloc.storage = await HydratedStorage.build(
-    storageDirectory: kIsWeb
-        ? HydratedStorageDirectory.web
-        : HydratedStorageDirectory((await getTemporaryDirectory()).path),
-  );
-
-  runApp(MultiBlocProvider(
-    providers: <SingleChildWidget>[
-      BlocProvider<CounterCubit>(
-        create: (BuildContext _) => CounterCubit(),
-      ),
-    ],
-    child: const MyApp(),
-  ));
 }
 
 class MyApp extends StatelessWidget {
@@ -1255,6 +1293,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hydrated_bloc/hydrated_bloc.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/foundation.dart';
+import 'core/di/dependency_injection.dart';
 import 'presentation/blocs/counter_bloc.dart';
 
 Future<void> main() async {
@@ -1268,11 +1307,12 @@ Future<void> runMainApp() async {
         ? HydratedStorageDirectory.web
         : HydratedStorageDirectory((await getTemporaryDirectory()).path),
   );
+  Injector.init();
 
   runApp(MultiBlocProvider(
       providers: [
         BlocProvider<CounterBloc>(
-          create: (BuildContext _) => CounterBloc(),
+          create: (BuildContext _) => Injector.get<CounterBloc>(),
         ),
       ],
       child: const MyApp()
@@ -1361,278 +1401,18 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
-  String _generateCubitMainContent() {
-    return '''
-import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:hydrated_bloc/hydrated_bloc.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:flutter/foundation.dart';
-import 'presentation/cubits/counter_cubit.dart';
-import 'presentation/cubits/counter_state.dart';
-
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await runMainApp();
-}
-
-Future<void> runMainApp() async {
-  HydratedBloc.storage = await HydratedStorage.build(
-    storageDirectory: kIsWeb
-        ? HydratedStorageDirectory.web
-        : HydratedStorageDirectory((await getTemporaryDirectory()).path),
-  );
-
-  runApp(MultiBlocProvider(
-    providers: [
-      BlocProvider<CounterCubit>(
-        create: (BuildContext _) => CounterCubit(),
-      ),
-    ],
-    child: const MyApp(),
-  ));
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
-      ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
-    );
-  }
-}
-
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  final String title;
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: Text(widget.title),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text(
-              'You have pushed the button this many times:',
-            ),
-            BlocBuilder<CounterCubit, CounterState>(
-              builder: (context, state) {
-                return Text(
-                  '\${state.count}',
-                  style: Theme.of(context).textTheme.headlineMedium,
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          FloatingActionButton(
-            onPressed: () {
-              context.read<CounterCubit>().decrement();
-            },
-            tooltip: 'Decrement',
-            child: const Icon(Icons.remove),
-          ),
-          const SizedBox(width: 16),
-          FloatingActionButton(
-            onPressed: () {
-              context.read<CounterCubit>().increment();
-            },
-            tooltip: 'Increment',
-            child: const Icon(Icons.add),
-          ),
-        ],
-      ),
-    );
-  }
-}
-''';
+  Future<void> createCleanArchitectureStructure(String projectName, StateManagementType stateManagement, ArchitectureType architecture, {bool includeGoRouter = false, bool includeFreezed = false}) async {
+    if (architecture == ArchitectureType.cleanArchitecture) {
+      // Create Clean Architecture directory structure
+      await _createCleanArchitectureStructure(projectName, stateManagement, includeGoRouter, includeFreezed);
+    } else {
+      // Create MVVM directory structure
+      await _createMvvmStructure(projectName, stateManagement, includeGoRouter, includeFreezed);
+    }
   }
 
-  String _generateProviderMainContent() {
-    return '''
-import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'presentation/providers/counter_provider.dart';
-
-void main() {
-  runApp(const MyApp());
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (context) => CounterProvider(),
-      child: MaterialApp(
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-          useMaterial3: true,
-        ),
-        home: const MyHomePage(title: 'Flutter Demo Home Page'),
-      ),
-    );
-  }
-}
-
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  final String title;
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: Text(widget.title),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text(
-              'You have pushed the button this many times:',
-            ),
-            Consumer<CounterProvider>(
-              builder: (context, counter, child) {
-                return Text(
-                  '\${counter.count}',
-                  style: Theme.of(context).textTheme.headlineMedium,
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          FloatingActionButton(
-            onPressed: () {
-              context.read<CounterProvider>().decrement();
-            },
-            tooltip: 'Decrement',
-            child: const Icon(Icons.remove),
-          ),
-          const SizedBox(width: 16),
-          FloatingActionButton(
-            onPressed: () {
-              context.read<CounterProvider>().increment();
-            },
-            tooltip: 'Increment',
-            child: const Icon(Icons.add),
-          ),
-        ],
-      ),
-    );
-  }
-}
-''';
-  }
-
-  String _generateBasicMainContent() {
-    return '''
-import 'package:flutter/material.dart';
-
-void main() {
-  runApp(const MyApp());
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
-      ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
-    );
-  }
-}
-
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  final String title;
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-
-  void _incrementCounter() {
-    setState(() {
-      _counter++;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: Text(widget.title),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text(
-              'You have pushed the button this many times:',
-            ),
-            Text(
-              '\$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ),
-    );
-  }
-}
-''';
-  }
-
-  @override
-  Future<void> createCleanArchitectureStructure(String projectName, StateManagementType stateManagement, {bool includeGoRouter = false, bool includeFreezed = false}) async {
+  Future<void> _createCleanArchitectureStructure(String projectName, StateManagementType stateManagement, bool includeGoRouter, bool includeFreezed) async {
     // Create Clean Architecture directory structure
     final cleanArchDirectories = [
       'lib/core',
@@ -1658,9 +1438,6 @@ class _MyHomePageState extends State<MyHomePage> {
       case StateManagementType.bloc:
         cleanArchDirectories.add('lib/presentation/blocs');
         break;
-      case StateManagementType.cubit:
-        cleanArchDirectories.add('lib/presentation/cubits');
-        break;
       case StateManagementType.provider:
         cleanArchDirectories.add('lib/presentation/providers');
         break;
@@ -1682,6 +1459,56 @@ class _MyHomePageState extends State<MyHomePage> {
 
     // Create base files for Clean Architecture
     await _createCleanArchitectureBaseFiles(projectName, stateManagement, includeFreezed);
+  }
+
+  Future<void> _createMvvmStructure(String projectName, StateManagementType stateManagement, bool includeGoRouter, bool includeFreezed) async {
+    // Create MVVM directory structure
+    final mvvmDirectories = [
+      'lib/core',
+      'lib/core/constants',
+      'lib/core/errors',
+      'lib/core/utils',
+      'lib/core/di',
+      'lib/models',
+      'lib/models/entities',
+      'lib/models/dto',
+      'lib/services',
+      'lib/services/api',
+      'lib/services/local',
+      'lib/viewmodels',
+      'lib/views',
+      'lib/views/pages',
+      'lib/views/widgets',
+      'lib/views/components',
+    ];
+
+    // Add state management specific directories
+    switch (stateManagement) {
+      case StateManagementType.provider:
+        mvvmDirectories.add('lib/viewmodels/providers');
+        break;
+      case StateManagementType.none:
+        mvvmDirectories.add('lib/viewmodels/controllers');
+        break;
+      case StateManagementType.bloc:
+        // Should not happen in MVVM, but just in case
+        mvvmDirectories.add('lib/viewmodels/blocs');
+        break;
+    }
+
+    // Add Go Router directories if requested
+    if (includeGoRouter) {
+      mvvmDirectories.addAll([
+        'lib/routes',
+      ]);
+    }
+
+    for (final dir in mvvmDirectories) {
+      Directory(path.join(projectName, dir)).createSync(recursive: true);
+    }
+
+    // Create base files for MVVM
+    await _createMvvmBaseFiles(projectName, stateManagement, includeFreezed);
   }
 
   Future<void> _createCleanArchitectureBaseFiles(String projectName, StateManagementType stateManagement, bool includeFreezed) async {
@@ -1844,120 +1671,6 @@ abstract class NoParamsUseCase<Type> {
   const NoParamsUseCase();
   
   Future<Either<Failure, Type>> call();
-}
-''';
-  }
-
-  String _generateDependencyInjectionContent(String projectName, StateManagementType stateManagement, bool includeFreezed) {
-    // Generate conditional imports based on state management type
-    String blocImports = '';
-    String cubitImports = '';
-    String providerImports = '';
-    
-    if (stateManagement == StateManagementType.bloc) {
-      if (includeFreezed) {
-        blocImports = '''
-import '../../presentation/blocs/sample_bloc.dart';''';
-      } else {
-        blocImports = '''
-import '../../presentation/blocs/counter_bloc.dart';''';
-      }
-    } else if (stateManagement == StateManagementType.cubit) {
-      cubitImports = '''
-import '../../presentation/cubits/counter_cubit.dart';''';
-    } else if (stateManagement == StateManagementType.provider) {
-      providerImports = '''
-import '../../presentation/providers/counter_provider.dart';''';
-    }
-    
-    // Generate conditional registration based on state management type
-    String blocRegistration = '';
-    String cubitRegistration = '';
-    String providerRegistration = '';
-    
-    if (stateManagement == StateManagementType.bloc) {
-      if (includeFreezed) {
-        blocRegistration = '''
-    // Register SampleBloc
-    registerLazySingleton<SampleBloc>(() => SampleBloc(sampleUseCase: get<SampleUseCase>()));''';
-      } else {
-        blocRegistration = '''
-    // Register CounterBloc
-    registerLazySingleton<CounterBloc>(() => CounterBloc());''';
-      }
-    } else if (stateManagement == StateManagementType.cubit) {
-      cubitRegistration = '''
-    // Register CounterCubit
-    registerLazySingleton<CounterCubit>(() => CounterCubit());''';
-    } else if (stateManagement == StateManagementType.provider) {
-      providerRegistration = '''
-    // Register CounterProvider
-    registerLazySingleton<CounterProvider>(() => CounterProvider());''';
-    }
-    
-    return '''
-import 'package:get_it/get_it.dart';
-import '../../domain/usecases/sample_usecase.dart';$blocImports$cubitImports$providerImports
-
-/// Custom Dependency Injection container using GetIt
-class Injector {
-  Injector._();
-
-  static final GetIt _locator = GetIt.instance;
-
-  static void init() {
-    _registerDataSources();
-    _registerRepositories();
-    _registerUseCases();
-    _registerBlocs();
-  }
-
-  static T get<T extends Object>() => _locator<T>();
-
-  static void registerSingleton<T extends Object>(T instance) {
-    _locator.registerSingleton<T>(instance);
-  }
-
-  static void registerLazySingleton<T extends Object>(T Function() factory) {
-    _locator.registerLazySingleton<T>(factory);
-  }
-
-  static void registerFactory<T extends Object>(T Function() factory) {
-    _locator.registerFactory<T>(factory);
-  }
-
-  //** ---- Data Sources ---- */
-  static void _registerDataSources() {
-    // Example: registerLazySingleton<AuthRemoteDataSource>(() => AuthRemoteDataSourceImpl());
-    // Example: registerLazySingleton<AuthLocalDataSource>(() => AuthLocalDataSourceImpl());
-  }
-
-  //** ---- Repositories ---- */
-  static void _registerRepositories() {
-    // Example: registerLazySingleton<AuthRepository>(() => AuthRepositoryImpl(
-    //   authRemoteDataSource: get<AuthRemoteDataSource>(),
-    //   authLocalDataSource: get<AuthLocalDataSource>(),
-    // ));
-  }
-
-  //** ---- Use Cases ---- */
-  static void _registerUseCases() {
-    // Example: registerLazySingleton<AuthUseCases>(() => AuthUseCases(
-    //   repository: get<AuthRepository>(),
-    // ));
-    
-    // Sample use cases
-    registerLazySingleton<SampleUseCase>(() => const SampleUseCase());
-    registerLazySingleton<SampleWithParamsUseCase>(() => const SampleWithParamsUseCase());
-  }
-
-  //** ---- BLoCs ---- */
-  static void _registerBlocs() {
-    // Example: registerLazySingleton(() => AuthBloc(
-    //   authUseCases: get<AuthUseCases>(),
-    // ));
-    $blocRegistration$cubitRegistration$providerRegistration
-  }
 }
 ''';
   }
@@ -2631,12 +2344,6 @@ export 'blocs/counter_state.dart';
 ''';
         }
         break;
-      case StateManagementType.cubit:
-        content += '''
-export 'cubits/counter_cubit.dart';
-export 'cubits/counter_state.dart';
-''';
-        break;
       case StateManagementType.provider:
         content += '''
 export 'providers/counter_provider.dart';
@@ -2837,6 +2544,820 @@ sealed class SampleState with _\$SampleState {
   }) = _SampleState;
 
   factory SampleState.fromJson(Map<String, dynamic> json) => _\$SampleStateFromJson(json);
+}
+''';
+  }
+
+  Future<void> _createMvvmBaseFiles(String projectName, StateManagementType stateManagement, bool includeFreezed) async {
+    // Create base entity
+    final entityFile = File(path.join(projectName, 'lib/models/entities/base_entity.dart'));
+    entityFile.writeAsStringSync(_generateBaseEntityContent());
+
+    // Create sample entity
+    final sampleEntityFile = File(path.join(projectName, 'lib/models/entities/sample_entity.dart'));
+    sampleEntityFile.writeAsStringSync(_generateSampleEntityContent(includeFreezed));
+
+    // Create base service
+    final serviceFile = File(path.join(projectName, 'lib/services/base_service.dart'));
+    serviceFile.writeAsStringSync(_generateBaseServiceContent());
+
+    // Create sample service
+    final sampleServiceFile = File(path.join(projectName, 'lib/services/api/sample_api_service.dart'));
+    sampleServiceFile.writeAsStringSync(_generateSampleApiServiceContent());
+
+    // Create base view model
+    final viewModelFile = File(path.join(projectName, 'lib/viewmodels/base_viewmodel.dart'));
+    viewModelFile.writeAsStringSync(_generateBaseViewModelContent());
+
+    // Create sample view model based on state management
+    await _createSampleViewModel(projectName, stateManagement, includeFreezed);
+
+    // Create dependency injection for MVVM
+    final diFile = File(path.join(projectName, 'lib/core/di/dependency_injection.dart'));
+    diFile.writeAsStringSync(_generateMvvmDependencyInjectionContent(projectName, stateManagement, includeFreezed));
+
+    // Create base error classes
+    final errorFile = File(path.join(projectName, 'lib/core/errors/failures.dart'));
+    errorFile.writeAsStringSync(_generateFailuresContent());
+
+    // Create base constants
+    final constantsFile = File(path.join(projectName, 'lib/core/constants/app_constants.dart'));
+    constantsFile.writeAsStringSync(_generateAppConstantsContent());
+
+    // Create MVVM HomePage
+    final homePageFile = File(path.join(projectName, 'lib/views/pages/home_page.dart'));
+    homePageFile.writeAsStringSync(_generateMvvmHomePageContent(projectName, stateManagement));
+
+    // Create data layer files
+    await _createMvvmDataLayerFiles(projectName, includeFreezed);
+  }
+
+  Future<void> _createSampleViewModel(String projectName, StateManagementType stateManagement, bool includeFreezed) async {
+    switch (stateManagement) {
+      case StateManagementType.provider:
+        final providerFile = File(path.join(projectName, 'lib/viewmodels/providers/sample_provider.dart'));
+        providerFile.writeAsStringSync(_generateMvvmProviderContent(includeFreezed));
+        break;
+      case StateManagementType.none:
+        final controllerFile = File(path.join(projectName, 'lib/viewmodels/controllers/sample_controller.dart'));
+        controllerFile.writeAsStringSync(_generateMvvmControllerContent(includeFreezed));
+        break;
+      case StateManagementType.bloc:
+        // Should not happen in MVVM, but just in case
+        final blocFile = File(path.join(projectName, 'lib/viewmodels/blocs/sample_bloc.dart'));
+        blocFile.writeAsStringSync(_generateMvvmBlocContent(includeFreezed));
+        break;
+    }
+  }
+
+  Future<void> _createMvvmDataLayerFiles(String projectName, bool includeFreezed) async {
+    // Create sample model
+    final sampleModelFile = File(path.join(projectName, 'lib/models/dto/sample_model.dart'));
+    sampleModelFile.writeAsStringSync(_generateSampleModelContent(includeFreezed));
+
+    // Create local service
+    final localServiceFile = File(path.join(projectName, 'lib/services/local/sample_local_service.dart'));
+    localServiceFile.writeAsStringSync(_generateSampleLocalServiceContent());
+  }
+
+  String _generateBaseServiceContent() {
+    return '''
+/// Base service interface for all services
+abstract class BaseService {
+  const BaseService();
+}
+''';
+  }
+
+  String _generateSampleApiServiceContent() {
+    return '''
+import 'package:dartz/dartz.dart';
+import '../../core/errors/failures.dart';
+import '../../models/dto/sample_model.dart';
+import '../base_service.dart';
+
+/// Sample API service interface
+abstract class SampleApiService extends BaseService {
+  Future<Either<Failure, List<SampleModel>>> getSamples();
+  Future<Either<Failure, SampleModel>> getSampleById(String id);
+  Future<Either<Failure, SampleModel>> createSample(SampleModel sample);
+  Future<Either<Failure, SampleModel>> updateSample(SampleModel sample);
+  Future<Either<Failure, bool>> deleteSample(String id);
+}
+
+/// Implementation of SampleApiService
+class SampleApiServiceImpl implements SampleApiService {
+  @override
+  Future<Either<Failure, List<SampleModel>>> getSamples() async {
+    try {
+      // Simulate API call
+      await Future.delayed(const Duration(seconds: 1));
+      
+      final samples = [
+        const SampleModel(id: '1', name: 'Sample 1', description: 'Description 1'),
+        const SampleModel(id: '2', name: 'Sample 2', description: 'Description 2'),
+      ];
+      
+      return Right(samples);
+    } catch (e) {
+      return Left(ServerFailure('Failed to fetch samples: \$e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, SampleModel>> getSampleById(String id) async {
+    try {
+      // Simulate API call
+      await Future.delayed(const Duration(seconds: 1));
+      
+      final sample = SampleModel(id: id, name: 'Sample \$id', description: 'Description \$id');
+      return Right(sample);
+    } catch (e) {
+      return Left(ServerFailure('Failed to fetch sample: \$e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, SampleModel>> createSample(SampleModel sample) async {
+    try {
+      // Simulate API call
+      await Future.delayed(const Duration(seconds: 1));
+      return Right(sample);
+    } catch (e) {
+      return Left(ServerFailure('Failed to create sample: \$e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, SampleModel>> updateSample(SampleModel sample) async {
+    try {
+      // Simulate API call
+      await Future.delayed(const Duration(seconds: 1));
+      return Right(sample);
+    } catch (e) {
+      return Left(ServerFailure('Failed to update sample: \$e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, bool>> deleteSample(String id) async {
+    try {
+      // Simulate API call
+      await Future.delayed(const Duration(seconds: 1));
+      return const Right(true);
+    } catch (e) {
+      return Left(ServerFailure('Failed to delete sample: \$e'));
+    }
+  }
+}
+''';
+  }
+
+  String _generateBaseViewModelContent() {
+    return '''
+import 'package:flutter/foundation.dart';
+
+/// Base view model class for all view models
+abstract class BaseViewModel extends ChangeNotifier {
+  bool _isLoading = false;
+  String? _error;
+
+  bool get isLoading => _isLoading;
+  String? get error => _error;
+
+  void setLoading(bool loading) {
+    _isLoading = loading;
+    notifyListeners();
+  }
+
+  void setError(String? error) {
+    _error = error;
+    notifyListeners();
+  }
+
+  void clearError() {
+    _error = null;
+    notifyListeners();
+  }
+}
+''';
+  }
+
+
+  String _generateMvvmProviderContent(bool includeFreezed) {
+    return '''
+import 'package:flutter/foundation.dart';
+import 'package:dartz/dartz.dart';
+import '../../core/errors/failures.dart';
+import '../../services/api/sample_api_service.dart';
+import '../../models/entities/sample_entity.dart';
+
+enum SampleStatus { initial, loading, success, error }
+
+class SampleProvider with ChangeNotifier {
+  final SampleApiService _apiService;
+  
+  SampleStatus _status = SampleStatus.initial;
+  List<SampleEntity> _samples = [];
+  String? _error;
+
+  SampleProvider({required SampleApiService apiService}) : _apiService = apiService {
+    loadSamples();
+  }
+
+  SampleStatus get status => _status;
+  List<SampleEntity> get samples => _samples;
+  String? get error => _error;
+
+  Future<void> loadSamples() async {
+    _status = SampleStatus.loading;
+    _error = null;
+    notifyListeners();
+    
+    final result = await _apiService.getSamples();
+    result.fold(
+      (failure) {
+        _status = SampleStatus.error;
+        _error = failure.message;
+        notifyListeners();
+      },
+      (models) {
+        _samples = models.map((model) => SampleEntity.fromModel(model)).toList();
+        _status = SampleStatus.success;
+        notifyListeners();
+      },
+    );
+  }
+}
+''';
+  }
+
+  String _generateMvvmControllerContent(bool includeFreezed) {
+    return '''
+import 'package:flutter/foundation.dart';
+import 'package:dartz/dartz.dart';
+import '../../core/errors/failures.dart';
+import '../../services/api/sample_api_service.dart';
+import '../../models/entities/sample_entity.dart';
+import '../base_viewmodel.dart';
+
+class SampleController extends BaseViewModel {
+  final SampleApiService _apiService;
+  
+  List<SampleEntity> _samples = [];
+
+  SampleController({required SampleApiService apiService}) : _apiService = apiService {
+    loadSamples();
+  }
+
+  List<SampleEntity> get samples => _samples;
+
+  Future<void> loadSamples() async {
+    setLoading(true);
+    clearError();
+    
+    final result = await _apiService.getSamples();
+    result.fold(
+      (failure) {
+        setError(failure.message);
+      },
+      (models) {
+        _samples = models.map((model) => SampleEntity.fromModel(model)).toList();
+      },
+    );
+    
+    setLoading(false);
+  }
+}
+''';
+  }
+
+  String _generateMvvmBlocContent(bool includeFreezed) {
+    return '''
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:hydrated_bloc/hydrated_bloc.dart';
+import 'package:dartz/dartz.dart';
+import '../../core/errors/failures.dart';
+import '../../services/api/sample_api_service.dart';
+import '../../models/entities/sample_entity.dart';
+
+// This should not be used in MVVM, but included for completeness
+class SampleBloc extends HydratedBloc<SampleEvent, SampleState> {
+  final SampleApiService _apiService;
+
+  SampleBloc({required SampleApiService apiService}) 
+    : _apiService = apiService, super(const SampleState()) {
+    on<LoadSamples>(_onLoadSamples);
+  }
+
+  Future<void> _onLoadSamples(LoadSamples event, Emitter<SampleState> emit) async {
+    emit(state.copyWith(status: SampleStatus.loading));
+    
+    final result = await _apiService.getSamples();
+    result.fold(
+      (failure) => emit(state.copyWith(
+        status: SampleStatus.error,
+        error: failure.message,
+      )),
+      (models) {
+        final entities = models.map((model) => SampleEntity.fromModel(model)).toList();
+        emit(state.copyWith(
+          status: SampleStatus.success,
+          samples: entities,
+        ));
+      },
+    );
+  }
+
+  @override
+  SampleState? fromJson(Map<String, dynamic> json) => SampleState.fromJson(json);
+
+  @override
+  Map<String, dynamic>? toJson(SampleState state) => state.toJson();
+}
+
+abstract class SampleEvent {}
+
+class LoadSamples extends SampleEvent {}
+
+enum SampleStatus { initial, loading, success, error }
+
+class SampleState {
+  final SampleStatus status;
+  final List<SampleEntity> samples;
+  final String? error;
+
+  const SampleState({
+    this.status = SampleStatus.initial,
+    this.samples = const [],
+    this.error,
+  });
+
+  SampleState copyWith({
+    SampleStatus? status,
+    List<SampleEntity>? samples,
+    String? error,
+  }) {
+    return SampleState(
+      status: status ?? this.status,
+      samples: samples ?? this.samples,
+      error: error ?? this.error,
+    );
+  }
+}
+''';
+  }
+
+  String _generateSampleLocalServiceContent() {
+    return '''
+import 'package:dartz/dartz.dart';
+import '../../core/errors/failures.dart';
+import '../dto/sample_model.dart';
+import '../base_service.dart';
+
+/// Sample local service for caching
+abstract class SampleLocalService extends BaseService {
+  Future<Either<Failure, List<SampleModel>>> getSamples();
+  Future<Either<Failure, SampleModel>> getSampleById(String id);
+  Future<Either<Failure, SampleModel>> saveSample(SampleModel sample);
+  Future<Either<Failure, bool>> deleteSample(String id);
+}
+
+/// Implementation of SampleLocalService
+class SampleLocalServiceImpl implements SampleLocalService {
+  @override
+  Future<Either<Failure, List<SampleModel>>> getSamples() async {
+    try {
+      // Simulate local storage
+      await Future.delayed(const Duration(milliseconds: 100));
+      
+      final samples = [
+        const SampleModel(id: '1', name: 'Local Sample 1', description: 'Local Description 1'),
+        const SampleModel(id: '2', name: 'Local Sample 2', description: 'Local Description 2'),
+      ];
+      
+      return Right(samples);
+    } catch (e) {
+      return Left(CacheFailure('Failed to fetch samples from cache: \$e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, SampleModel>> getSampleById(String id) async {
+    try {
+      // Simulate local storage
+      await Future.delayed(const Duration(milliseconds: 100));
+      
+      final sample = SampleModel(id: id, name: 'Local Sample \$id', description: 'Local Description \$id');
+      return Right(sample);
+    } catch (e) {
+      return Left(CacheFailure('Failed to fetch sample from cache: \$e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, SampleModel>> saveSample(SampleModel sample) async {
+    try {
+      // Simulate local storage
+      await Future.delayed(const Duration(milliseconds: 100));
+      return Right(sample);
+    } catch (e) {
+      return Left(CacheFailure('Failed to save sample to cache: \$e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, bool>> deleteSample(String id) async {
+    try {
+      // Simulate local storage
+      await Future.delayed(const Duration(milliseconds: 100));
+      return const Right(true);
+    } catch (e) {
+      return Left(CacheFailure('Failed to delete sample from cache: \$e'));
+    }
+  }
+}
+''';
+  }
+
+  String _generateMvvmDependencyInjectionContent(String projectName, StateManagementType stateManagement, bool includeFreezed) {
+    String viewModelRegistration = '';
+    
+    switch (stateManagement) {
+      case StateManagementType.provider:
+        viewModelRegistration = '''
+    // Register SampleProvider
+    registerLazySingleton<SampleProvider>(() => SampleProvider(apiService: get<SampleApiService>()));''';
+        break;
+      case StateManagementType.none:
+        viewModelRegistration = '''
+    // Register SampleController
+    registerLazySingleton<SampleController>(() => SampleController(apiService: get<SampleApiService>()));''';
+        break;
+      case StateManagementType.bloc:
+        viewModelRegistration = '''
+    // Register SampleBloc (should not be used in MVVM)
+    registerLazySingleton<SampleBloc>(() => SampleBloc(apiService: get<SampleApiService>()));''';
+        break;
+    }
+    
+    return '''
+import 'package:get_it/get_it.dart';
+import '../services/api/sample_api_service.dart';
+import '../services/local/sample_local_service.dart';
+
+/// MVVM Dependency Injection container using GetIt
+class Injector {
+  Injector._();
+
+  static final GetIt _locator = GetIt.instance;
+
+  static void init() {
+    _registerServices();
+    _registerViewModels();
+  }
+
+  static T get<T extends Object>() => _locator<T>();
+
+  static void registerSingleton<T extends Object>(T instance) {
+    _locator.registerSingleton<T>(instance);
+  }
+
+  static void registerLazySingleton<T extends Object>(T Function() factory) {
+    _locator.registerLazySingleton<T>(factory);
+  }
+
+  static void registerFactory<T extends Object>(T Function() factory) {
+    _locator.registerFactory<T>(factory);
+  }
+
+  //** ---- Services ---- */
+  static void _registerServices() {
+    // Register API services
+    registerLazySingleton<SampleApiService>(() => SampleApiServiceImpl());
+    
+    // Register local services
+    registerLazySingleton<SampleLocalService>(() => SampleLocalServiceImpl());
+  }
+
+  //** ---- View Models ---- */
+  static void _registerViewModels() {
+    $viewModelRegistration
+  }
+}
+''';
+  }
+
+  String _generateMvvmMainContent(StateManagementType stateManagement, bool includeGoRouter, bool includeFreezed) {
+    String imports = '';
+    String providers = '';
+    String providerType = '';
+    
+    switch (stateManagement) {
+      
+      case StateManagementType.provider:
+        imports = '''
+import 'package:provider/provider.dart';
+import 'viewmodels/providers/sample_provider.dart';''';
+        providers = '''
+        ChangeNotifierProvider<SampleProvider>(
+          create: (BuildContext _) => Injector.get<SampleProvider>(),
+        ),''';
+        providerType = 'MultiProvider';
+        break;
+      case StateManagementType.none:
+        imports = '''
+import 'package:provider/provider.dart';
+import 'viewmodels/controllers/sample_controller.dart';''';
+        providers = '''
+        ChangeNotifierProvider<SampleController>(
+          create: (BuildContext _) => Injector.get<SampleController>(),
+        ),''';
+        providerType = 'MultiProvider';
+        break;
+      case StateManagementType.bloc:
+        imports = '''
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'viewmodels/blocs/sample_bloc.dart';''';
+        providers = '''
+        BlocProvider<SampleBloc>(
+          create: (BuildContext _) => Injector.get<SampleBloc>(),
+        ),''';
+        providerType = 'MultiBlocProvider';
+        break;
+    }
+    
+    String routerConfig = '';
+    String routerImports = '';
+    String localizationsImports = '';
+    String localizationsSetup = '';
+    String homePageImport = '';
+    
+    if (includeGoRouter) {
+      routerImports = '''
+import 'routes/app_router.dart';''';
+      localizationsImports = '''
+import 'application/generated/l10n/app_localizations.dart';''';
+      localizationsSetup = '''
+    localizationsDelegates: AppLocalizationsSetup.localizationsDelegates,
+    supportedLocales: AppLocalizationsSetup.supportedLocales,''';
+      routerConfig = '''
+    routerConfig: AppRouter.router,''';
+    } else {
+      homePageImport = '''
+import 'views/pages/home_page.dart';''';
+    }
+    
+    return '''
+import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'core/di/dependency_injection.dart';$imports$routerImports$localizationsImports$homePageImport
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await runMainApp();
+}
+
+Future<void> runMainApp() async {
+  Injector.init();
+
+  runApp($providerType(
+    providers: [$providers
+    ],
+    child: const MyApp()
+  ));
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp${includeGoRouter ? '.router' : ''}(
+      title: 'MVVM Flutter App',
+      debugShowCheckedModeBanner: kDebugMode,
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        useMaterial3: true,
+      ),$routerConfig$localizationsSetup
+      themeAnimationCurve: Curves.easeInOut,
+      themeAnimationDuration: const Duration(milliseconds: 300),
+      themeAnimationStyle: AnimationStyle(
+        curve: Curves.easeInOut,
+        duration: const Duration(milliseconds: 300),
+        reverseCurve: Curves.easeInOut,
+        reverseDuration: const Duration(milliseconds: 300),
+      ),
+        home: ${includeGoRouter ? 'null' : 'const HomePage()'},
+      ),
+    );
+  }
+}
+''';
+  }
+
+  String _generateMvvmHomePageContent(String projectName, StateManagementType stateManagement) {
+    String stateManagementWidget = '';
+    String imports = '';
+    
+    switch (stateManagement) {
+      case StateManagementType.provider:
+        imports = '''
+import 'package:provider/provider.dart';
+import '../viewmodels/providers/sample_provider.dart';''';
+        stateManagementWidget = '''
+            Consumer<SampleProvider>(
+              builder: (context, provider, child) {
+                switch (provider.status) {
+                  case SampleStatus.loading:
+                    return const CircularProgressIndicator();
+                  case SampleStatus.error:
+                    return Text('Error: \${provider.error}');
+                  case SampleStatus.success:
+                    return Column(
+                      children: [
+                        Text('Samples: \${provider.samples.length}'),
+                        ...provider.samples.map((sample) => ListTile(
+                          title: Text(sample.name),
+                          subtitle: Text(sample.description),
+                        )),
+                      ],
+                    );
+                  case SampleStatus.initial:
+                    return const Text('Initial state');
+                }
+              },
+            ),''';
+        break;
+      case StateManagementType.none:
+        imports = '''
+import '../viewmodels/controllers/sample_controller.dart';
+import '../core/di/dependency_injection.dart';''';
+        stateManagementWidget = '''
+            Consumer<SampleController>(
+              builder: (context, controller, child) {
+                if (controller.isLoading) {
+                  return const CircularProgressIndicator();
+                }
+                if (controller.error != null) {
+                  return Text('Error: \${controller.error}');
+                }
+                return Column(
+                  children: [
+                    Text('Samples: \${controller.samples.length}'),
+                    ...controller.samples.map((sample) => ListTile(
+                      title: Text(sample.name),
+                      subtitle: Text(sample.description),
+                    )),
+                  ],
+                );
+              },
+            ),''';
+        break;
+      case StateManagementType.bloc:
+        imports = '''
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../viewmodels/blocs/sample_bloc.dart';''';
+        stateManagementWidget = '''
+            BlocBuilder<SampleBloc, SampleState>(
+              builder: (context, state) {
+                switch (state.status) {
+                  case SampleStatus.loading:
+                    return const CircularProgressIndicator();
+                  case SampleStatus.error:
+                    return Text('Error: \${state.error}');
+                  case SampleStatus.success:
+                    return Column(
+                      children: [
+                        Text('Samples: \${state.samples.length}'),
+                        ...state.samples.map((sample) => ListTile(
+                          title: Text(sample.name),
+                          subtitle: Text(sample.description),
+                        )),
+                      ],
+                    );
+                  case SampleStatus.initial:
+                    return const Text('Initial state');
+                }
+              },
+            ),''';
+        break;
+    }
+    
+    return '''
+import 'package:flutter/material.dart';$imports
+
+/// MVVM HomePage
+/// This page follows MVVM pattern and is located in the views layer
+class HomePage extends StatefulWidget {
+  const HomePage({super.key});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        title: const Text('MVVM Home'),
+        centerTitle: true,
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            const Text(
+              'Welcome to MVVM Architecture!',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'This page demonstrates MVVM pattern with state management.',
+              style: TextStyle(fontSize: 16),
+            ),
+            const SizedBox(height: 30),
+            $stateManagementWidget
+            const SizedBox(height: 30),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey[300]!),
+              ),
+              child: const Column(
+                children: [
+                  Text(
+                    '🏗️ MVVM Architecture Structure:',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  SizedBox(height: 8),
+                  Text('• lib/models/ - Entities and DTOs'),
+                  Text('• lib/services/ - API and Local services'),
+                  Text('• lib/viewmodels/ - Business logic and state'),
+                  Text('• lib/views/ - UI components'),
+                  Text('• lib/core/ - Utilities and DI'),
+                  SizedBox(height: 8),
+                  Text(
+                    '💉 Dependency Injection: GetIt + MVVM Injector',
+                    style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+''';
+  }
+
+  String _generateDependencyInjectionContent(String projectName, StateManagementType stateManagement, bool includeFreezed) {
+    final String stateManagementImport = stateManagement == StateManagementType.bloc 
+        ? "import 'package:flutter_bloc/flutter_bloc.dart';"
+        : stateManagement == StateManagementType.provider 
+            ? "import 'package:provider/provider.dart';"
+            : "";
+    
+    final String stateManagementRegistration = stateManagement == StateManagementType.bloc 
+        ? '''
+    // Register BLoCs
+    getIt.registerFactory<MainBloc>(() => MainBloc());'''
+        : stateManagement == StateManagementType.provider 
+            ? '''
+    // Register Providers
+    getIt.registerFactory<MainProvider>(() => MainProvider());'''
+            : "";
+
+    return '''
+import 'package:get_it/get_it.dart';
+$stateManagementImport
+
+final GetIt getIt = GetIt.instance;
+
+class DependencyInjection {
+  static Future<void> init() async {
+    // Register repositories
+    // getIt.registerLazySingleton<ProjectRepository>(
+    //   () => ProjectRepositoryImpl(getIt()),
+    // );
+    
+    // Register data sources
+    // getIt.registerLazySingleton<FileSystemDataSource>(
+    //   () => FileSystemDataSourceImpl(),
+    // );
+    
+    // Register use cases
+    // getIt.registerLazySingleton<CreateProjectUseCase>(
+    //   () => CreateProjectUseCase(getIt()),
+    // );
+$stateManagementRegistration
+  }
 }
 ''';
   }

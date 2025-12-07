@@ -8,7 +8,7 @@ import 'presentation/controllers/cli_controller.dart';
 
 /// Main CLI class for FlutterForge
 class FlutterForgeCLI {
-  static const String _appName = 'flutterforce';
+  static const String _appName = 'flutterforge';
   static const String _description = 'A Flutter CLI tool for creating projects with interactive prompts.';
   static const String _version = '1.10.0';
 

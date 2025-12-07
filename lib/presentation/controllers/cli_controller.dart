@@ -35,21 +35,17 @@ class CliController {
     final projectName = _getProjectName();
     final organization = _getOrganization();
     final platforms = _getPlatforms();
-    final stateManagement = _getStateManagement();
-    final includeGoRouter = _getGoRouterChoice();
-    final includeCleanArchitecture = _getCleanArchitectureChoice();
     final includeLinterRules = _getLinterRulesChoice();
-    final includeFreezed = _getFreezedChoice(stateManagement);
 
     final config = ProjectConfig(
       projectName: projectName,
       organizationName: organization,
       platforms: platforms,
-      stateManagement: stateManagement,
-      includeGoRouter: includeGoRouter,
-      includeCleanArchitecture: includeCleanArchitecture,
+      stateManagement: StateManagementType.bloc,
+      architecture: ArchitectureType.cleanArchitecture,
+      includeGoRouter: true,
       includeLinterRules: includeLinterRules,
-      includeFreezed: includeFreezed,
+      includeFreezed: true,
     );
 
     _printConfigurationSummary(config);
@@ -180,102 +176,106 @@ class CliController {
     
     // Quick selection options
     print('${_brightYellow}${_bold}⚡ Quick Options:${_reset}');
-    print('${_dim}• Type "mobile" to select Android + iOS${_reset}');
-    print('${_dim}• Type "desktop" to select Windows + macOS + Linux${_reset}');
-    print('${_dim}• Type "all" to select all platforms${_reset}');
+    print('${_dim}• Type "mobile" to pre-select Android + iOS${_reset}');
+    print('${_dim}• Type "desktop" to pre-select Windows + macOS + Linux${_reset}');
+    print('${_dim}• Type "all" to pre-select all platforms${_reset}');
     print('${_dim}• Type "none" to skip all platforms${_reset}');
     print('');
     
-    stdout.write('${_brightGreen}${_bold}⚡ Quick selection (or press Enter for individual):${_reset} ');
-    final quickChoice = stdin.readLineSync()?.trim().toLowerCase() ?? '';
-    
-    switch (quickChoice) {
-      case 'mobile':
-        return [PlatformType.mobile];
-      case 'desktop':
-        return [PlatformType.desktop];
-      case 'all':
-        return [PlatformType.mobile, PlatformType.web, PlatformType.desktop];
-      case 'none':
-        return [];
-      default:
-        // Individual selection
-        print('');
-        print('${_brightCyan}${_bold}📱 Mobile Platforms:${_reset}');
-        if (_getYesNoChoice('   Include Android?', defaultYes: true)) {
-          platforms.add(PlatformType.mobile);
-        }
-        
-        print('');
-        print('${_brightCyan}${_bold}🌐 Web Platform:${_reset}');
-        if (_getYesNoChoice('   Include Web?', defaultYes: false)) {
-          platforms.add(PlatformType.web);
-        }
-        
-        print('');
-        print('${_brightCyan}${_bold}💻 Desktop Platforms:${_reset}');
-        if (_getYesNoChoice('   Include Windows?', defaultYes: false)) {
-          platforms.add(PlatformType.desktop);
-        }
-        
-        if (platforms.isEmpty) {
-          print('${_brightYellow}⚠️  No platforms selected. Defaulting to Mobile (Android & iOS).${_reset}');
-          platforms.add(PlatformType.mobile);
-        }
-        
-        return platforms;
-    }
-  }
-
-  StateManagementType _getStateManagement() {
-    print('');
-    print('${_brightYellow}${_bold}🎯 State Management${_reset}');
-    print('${_yellow}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${_reset}');
-    print('');
-    
-    print('${_brightCyan}${_bold}Choose your state management solution:${_reset}');
-    print('${_dim}1.${_reset} ${_brightGreen}BLoC${_reset} ${_dim}- Business Logic Component (Recommended)${_reset}');
-    print('${_dim}2.${_reset} ${_brightGreen}Cubit${_reset} ${_dim}- Simpler BLoC alternative${_reset}');
-    print('${_dim}3.${_reset} ${_brightGreen}Provider${_reset} ${_dim}- Simple state management${_reset}');
-    print('${_dim}4.${_reset} ${_brightGreen}None${_reset} ${_dim}- Basic Flutter state management${_reset}');
-    print('');
-    
+    // Quick selection for pre-filling
+    String quickChoice = '';
     while (true) {
-      stdout.write('${_brightGreen}${_bold}🎯 Your choice (1-4):${_reset} ');
-      final choice = stdin.readLineSync()?.trim() ?? '';
+      stdout.write('${_brightGreen}${_bold}⚡ Quick selection (or press Enter for individual):${_reset} ');
+      quickChoice = stdin.readLineSync()?.trim().toLowerCase() ?? '';
       
-      switch (choice) {
-        case '1':
-          return StateManagementType.bloc;
-        case '2':
-          return StateManagementType.cubit;
-        case '3':
-          return StateManagementType.provider;
-        case '4':
-          return StateManagementType.none;
+      switch (quickChoice) {
+        case 'mobile':
+          print('${_brightGreen}✅ Pre-selected: Mobile (Android & iOS)${_reset}');
+          break;
+        case 'desktop':
+          print('${_brightGreen}✅ Pre-selected: Desktop (Windows, macOS, Linux)${_reset}');
+          break;
+        case 'all':
+          print('${_brightGreen}✅ Pre-selected: All Platforms${_reset}');
+          break;
+        case 'none':
+          print('${_brightGreen}✅ Pre-selected: No Platforms${_reset}');
+          break;
+        case '':
+          // Empty input - no pre-selection
+          break;
         default:
-          print('${_brightRed}❌ Invalid choice. Please enter 1, 2, 3, or 4.${_reset}');
+          // Invalid input - show error and ask again
+          print('${_brightRed}❌ Invalid quick selection. Please enter "mobile", "desktop", "all", "none", or press Enter for individual selection.${_reset}');
+          print('');
+          continue;
+      }
+      
+      // If we reach here, we have a valid selection
+      break;
+    }
+    
+    // Individual selection with pre-filling
+    print('');
+    print('${_brightCyan}${_bold}📱 Mobile Platforms:${_reset}');
+    bool includeMobile = false;
+    if (quickChoice == 'mobile' || quickChoice == 'all') {
+      // For mobile selection, ask about both Android and iOS
+      bool includeAndroid = _getYesNoChoice('   Include Android?', defaultYes: true);
+      bool includeIOS = _getYesNoChoice('   Include iOS?', defaultYes: true);
+      includeMobile = includeAndroid || includeIOS;
+    } else if (quickChoice == 'desktop' || quickChoice == 'none') {
+      // Skip mobile for desktop/none selections
+      includeMobile = false;
+    } else {
+      includeMobile = _getYesNoChoice('   Include Android?', defaultYes: false);
+    }
+    if (includeMobile) {
+      platforms.add(PlatformType.mobile);
+    }
+    
+    // Only ask about Web if not specifically excluded
+    if (quickChoice != 'mobile' && quickChoice != 'desktop' && quickChoice != 'none') {
+      print('');
+      print('${_brightCyan}${_bold}🌐 Web Platform:${_reset}');
+      bool includeWeb = false;
+      if (quickChoice == 'all') {
+        includeWeb = _getYesNoChoice('   Include Web?', defaultYes: true);
+      } else {
+        includeWeb = _getYesNoChoice('   Include Web?', defaultYes: false);
+      }
+      if (includeWeb) {
+        platforms.add(PlatformType.web);
       }
     }
+    
+    // Only ask about Desktop if not specifically excluded
+    if (quickChoice != 'mobile' && quickChoice != 'none') {
+      print('');
+      print('${_brightCyan}${_bold}💻 Desktop Platforms:${_reset}');
+      bool includeDesktop = false;
+      if (quickChoice == 'desktop' || quickChoice == 'all') {
+        // For desktop selection, ask about Windows, macOS, and Linux
+        bool includeWindows = _getYesNoChoice('   Include Windows?', defaultYes: true);
+        bool includeMacOS = _getYesNoChoice('   Include macOS?', defaultYes: true);
+        bool includeLinux = _getYesNoChoice('   Include Linux?', defaultYes: true);
+        includeDesktop = includeWindows || includeMacOS || includeLinux;
+      } else {
+        includeDesktop = _getYesNoChoice('   Include Windows?', defaultYes: false);
+      }
+      if (includeDesktop) {
+        platforms.add(PlatformType.desktop);
+      }
+    }
+    
+    if (platforms.isEmpty) {
+      print('${_brightYellow}⚠️  No platforms selected. Defaulting to Mobile (Android & iOS).${_reset}');
+      platforms.add(PlatformType.mobile);
+    }
+    
+    return platforms;
   }
 
-  bool _getGoRouterChoice() {
-    print('');
-    print('${_brightYellow}${_bold}🛣️  Navigation${_reset}');
-    print('${_yellow}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${_reset}');
-    print('');
-    
-    return _getYesNoChoice('${_brightCyan}${_bold}🚀 Include Go Router for navigation?${_reset} ${_dim}(Declarative routing)${_reset}', defaultYes: false);
-  }
-
-  bool _getCleanArchitectureChoice() {
-    print('');
-    print('${_brightYellow}${_bold}🏗️  Architecture${_reset}');
-    print('${_yellow}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${_reset}');
-    print('');
-    
-    return _getYesNoChoice('${_brightCyan}${_bold}🏛️  Apply Clean Architecture principles?${_reset} ${_dim}(Core, Domain, Data, Presentation layers)${_reset}', defaultYes: false);
-  }
 
   bool _getLinterRulesChoice() {
     print('');
@@ -286,17 +286,7 @@ class CliController {
     return _getYesNoChoice('${_brightCyan}${_bold}✨ Add custom linter rules?${_reset} ${_dim}(Enhanced code quality)${_reset}', defaultYes: false);
   }
 
-  bool _getFreezedChoice(StateManagementType stateManagement) {
-    if (stateManagement == StateManagementType.bloc) {
-      print('');
-      print('${_brightYellow}${_bold}❄️  Code Generation${_reset}');
-      print('${_yellow}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${_reset}');
-      print('');
-      
-      return _getYesNoChoice('${_brightCyan}${_bold}❄️  Use Freezed for BLoC, entities, and models?${_reset} ${_dim}(Immutable data classes)${_reset}', defaultYes: false);
-    }
-    return false;
-  }
+  // Freezed is now always included - no need to ask user
 
   bool _getYesNoChoice(String question, {bool defaultYes = false}) {
     final defaultText = defaultYes ? 'Y/n' : 'y/N';
@@ -330,26 +320,18 @@ class CliController {
     print('${_magenta}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${_reset}');
     print('');
     
-    print('${_brightCyan}${_bold}🏗️  Project:${_reset} ${_brightGreen}${config.projectName}${_reset}');
-    print('${_brightCyan}${_bold}🏢 Organization:${_reset} ${_brightGreen}${config.organizationName}${_reset}');
-    print('${_brightCyan}${_bold}🌍 Platforms:${_reset} ${_brightGreen}${config.platforms.join(', ')}${_reset}');
-    print('${_brightCyan}${_bold}🎯 State Management:${_reset} ${_brightGreen}${config.stateManagement.name.toUpperCase()}${_reset}');
-    
-    if (config.includeGoRouter) {
-      print('${_brightCyan}${_bold}🛣️  Navigation:${_reset} ${_brightGreen}Go Router${_reset}');
-    }
-    
-    if (config.includeCleanArchitecture) {
-      print('${_brightCyan}${_bold}🏛️  Architecture:${_reset} ${_brightGreen}Clean Architecture${_reset}');
-    }
+    print('${_brightCyan}${_bold}Project:${_reset} ${_brightGreen}${config.projectName}${_reset}');
+    print('${_brightCyan}${_bold}Organization:${_reset} ${_brightGreen}${config.organizationName}${_reset}');
+    print('${_brightCyan}${_bold}Platforms:${_reset} ${_brightGreen}${config.platforms.join(', ')}${_reset}');
+    print('${_brightCyan}${_bold}State Management:${_reset} ${_brightGreen}BLoC${_reset}');
+    print('${_brightCyan}${_bold}Navigation:${_reset} ${_brightGreen}Go Router${_reset}');
+    print('${_brightCyan}${_bold}Architecture:${_reset} ${_brightGreen}Clean Architecture${_reset}');
     
     if (config.includeLinterRules) {
-      print('${_brightCyan}${_bold}🔍 Code Quality:${_reset} ${_brightGreen}Custom Linter Rules${_reset}');
+      print('${_brightCyan}${_bold}Code Quality:${_reset} ${_brightGreen}Custom Linter Rules${_reset}');
     }
     
-    if (config.includeFreezed) {
-      print('${_brightCyan}${_bold}❄️  Code Generation:${_reset} ${_brightGreen}Freezed${_reset}');
-    }
+    print('${_brightCyan}${_bold}Code Generation:${_reset} ${_brightGreen}Freezed${_reset}');
     
     print('');
   }
@@ -379,11 +361,9 @@ class CliController {
       print('${_brightYellow}${_bold}🌍 For localization (if needed):${_reset}');
       print('${_dim}   dart run intl_utils:generate${_reset}');
       
-      if (config.includeFreezed) {
-        print('');
-        print('${_brightYellow}${_bold}❄️  For Freezed code generation:${_reset}');
-        print('${_dim}   dart run build_runner build -d${_reset}');
-      }
+      print('');
+      print('${_brightYellow}${_bold}For Freezed code generation:${_reset}');
+      print('${_dim}   dart run build_runner build -d${_reset}');
       
       print('');
       print('${_brightMagenta}${_bold}✨ Happy coding with FlutterForge! ✨${_reset}');

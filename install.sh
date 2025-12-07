@@ -21,9 +21,22 @@ if ! command -v flutter &> /dev/null; then
     exit 1
 fi
 
+# Check Dart SDK version compatibility
+DART_VERSION=$(dart --version 2>&1 | grep -o 'Dart VM version: [0-9]\+\.[0-9]\+' | cut -d' ' -f4)
+REQUIRED_VERSION="3.7.0"
+
+if [ "$(printf '%s\n' "$REQUIRED_VERSION" "$DART_VERSION" | sort -V | head -n1)" != "$REQUIRED_VERSION" ]; then
+    echo "❌ Dart version $DART_VERSION is not compatible. Required: >= $REQUIRED_VERSION"
+    echo "   Please update Dart: https://dart.dev/get-dart"
+    exit 1
+fi
+
 # Install the CLI globally
 echo "📦 Installing FlutterForge CLI..."
 dart pub global activate --source path .
+
+# Ensure .pub-cache/bin exists
+mkdir -p "$HOME/.pub-cache/bin"
 
 # Add to PATH if not already there
 if [[ ":$PATH:" != *":$HOME/.pub-cache/bin:"* ]]; then
@@ -31,25 +44,54 @@ if [[ ":$PATH:" != *":$HOME/.pub-cache/bin:"* ]]; then
     
     # Detect shell and add to appropriate config file
     if [[ "$SHELL" == *"zsh"* ]]; then
-        echo 'export PATH="$PATH:$HOME/.pub-cache/bin"' >> ~/.zshrc
-        echo "Please restart your terminal or run: source ~/.zshrc"
+        CONFIG_FILE="$HOME/.zshrc"
+        EXPORT_LINE='export PATH="$PATH:$HOME/.pub-cache/bin"'
     elif [[ "$SHELL" == *"bash"* ]]; then
-        echo 'export PATH="$PATH:$HOME/.pub-cache/bin"' >> ~/.bashrc
-        echo "Please restart your terminal or run: source ~/.bashrc"
+        CONFIG_FILE="$HOME/.bashrc"
+        EXPORT_LINE='export PATH="$PATH:$HOME/.pub-cache/bin"'
     elif [[ "$SHELL" == *"fish"* ]]; then
-        echo 'set -gx PATH $PATH $HOME/.pub-cache/bin' >> ~/.config/fish/config.fish
-        echo "Please restart your terminal or run: source ~/.config/fish/config.fish"
+        CONFIG_FILE="$HOME/.config/fish/config.fish"
+        EXPORT_LINE='set -gx PATH $PATH $HOME/.pub-cache/bin'
     else
+        echo "⚠️  Unknown shell: $SHELL"
         echo "Please add $HOME/.pub-cache/bin to your PATH manually"
+        CONFIG_FILE=""
     fi
+    
+    if [[ -n "$CONFIG_FILE" ]]; then
+        # Check if the export line already exists
+        if ! grep -q "$HOME/.pub-cache/bin" "$CONFIG_FILE" 2>/dev/null; then
+            echo "" >> "$CONFIG_FILE"
+            echo "# FlutterForge CLI PATH" >> "$CONFIG_FILE"
+            echo "$EXPORT_LINE" >> "$CONFIG_FILE"
+            echo "✅ Added to $CONFIG_FILE"
+        else
+            echo "✅ PATH already configured in $CONFIG_FILE"
+        fi
+    fi
+else
+    echo "✅ PATH already includes $HOME/.pub-cache/bin"
 fi
 
-echo "✅ FlutterForge CLI installed successfully!"
-echo ""
-echo "🎯 Usage:"
-echo "  flutterforge"
-echo ""
-echo "📚 For more information, visit:"
-echo "  https://github.com/victorsdd01/flutter_forge"
-echo ""
-echo "🚀 Happy coding with Flutter!" 
+# Verify installation
+echo "🔍 Verifying installation..."
+if command -v flutterforge &> /dev/null; then
+    echo "✅ FlutterForge CLI installed successfully!"
+    echo ""
+    echo "🎯 Usage:"
+    echo "  flutterforge"
+    echo "  flutterforge --version"
+    echo "  flutterforge --help"
+    echo ""
+    echo "📚 For more information, visit:"
+    echo "  https://github.com/victorsdd01/flutter_forge"
+    echo ""
+    echo "🚀 Happy coding with FlutterForge!"
+    echo ""
+    echo "💡 Note: If you just installed, you may need to restart your terminal"
+    echo "   or run: source $CONFIG_FILE"
+else
+    echo "❌ Installation verification failed"
+    echo "Please try restarting your terminal or run: source $CONFIG_FILE"
+    exit 1
+fi 
