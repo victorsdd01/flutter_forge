@@ -1,15 +1,61 @@
 import 'dart:io';
+import 'dart:isolate';
+import 'package:path/path.dart' as path;
 
 class TemplateGenerator {
   static final TemplateGenerator _instance = TemplateGenerator._();
   TemplateGenerator._();
   static TemplateGenerator get instance => _instance;
 
+  String? _packageRootPath;
+
+  String _getPackageRootPath() {
+    if (_packageRootPath != null) {
+      return _packageRootPath!;
+    }
+
+    try {
+      final packageUri = Isolate.resolvePackageUri(Uri.parse('package:flutterforge/core/templates/template_generator.dart'));
+      if (packageUri != null) {
+        final packagePath = packageUri.toFilePath();
+        final libDir = Directory(path.dirname(packagePath));
+        final packageRoot = libDir.parent;
+        
+        final templatesDir = Directory(path.join(packageRoot.path, 'lib', 'core', 'templates', 'blocs'));
+        if (templatesDir.existsSync()) {
+          _packageRootPath = packageRoot.path;
+          return _packageRootPath!;
+        }
+      }
+    } catch (e) {
+    }
+
+    final scriptPath = Platform.script.toFilePath();
+    final scriptDir = Directory(path.dirname(scriptPath)).absolute;
+    
+    Directory currentDir = scriptDir;
+    
+    while (currentDir.path != currentDir.parent.path) {
+      final libDir = Directory(path.join(currentDir.path, 'lib'));
+      final templatesDir = Directory(path.join(libDir.path, 'core', 'templates', 'blocs'));
+      
+      if (templatesDir.existsSync()) {
+        _packageRootPath = currentDir.path;
+        return _packageRootPath!;
+      }
+      
+      currentDir = currentDir.parent;
+    }
+    
+    throw Exception('Could not find package root. Templates directory not found.');
+  }
+
   Future<void> generateProjectTemplates({
     required String projectName,
     required String projectPath,
   }) async {
-    final templatePath = 'lib/core/templates/blocs';
+    final packageRoot = _getPackageRootPath();
+    final templatePath = path.join(packageRoot, 'lib', 'core', 'templates', 'blocs');
     final libPath = '$projectPath/lib';
     await _copyTemplates(templatePath, libPath, projectName);
   }
