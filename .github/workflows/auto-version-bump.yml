@@ -280,13 +280,32 @@ jobs:
           EOF
           )
           
+          # Check which labels exist in the repository
+          AVAILABLE_LABELS=""
+          if gh label list --json name --jq '.[].name' | grep -q "^automated$"; then
+            AVAILABLE_LABELS="automated"
+          fi
+          if gh label list --json name --jq '.[].name' | grep -q "^chore$"; then
+            if [ -n "$AVAILABLE_LABELS" ]; then
+              AVAILABLE_LABELS="$AVAILABLE_LABELS,chore"
+            else
+              AVAILABLE_LABELS="chore"
+            fi
+          fi
+          
+          # Build PR create command
+          PR_CMD="gh pr create --title \"chore: bump version to $VERSION [skip ci]\" --body \"$PR_BODY\" --base main --head \"$BRANCH_NAME\""
+          
+          # Add labels only if they exist
+          if [ -n "$AVAILABLE_LABELS" ]; then
+            PR_CMD="$PR_CMD --label \"$AVAILABLE_LABELS\""
+            echo "Using labels: $AVAILABLE_LABELS"
+          else
+            echo "⚠️ Labels 'automated' and 'chore' not found. Creating PR without labels."
+          fi
+          
           # Create PR and capture output
-          PR_OUTPUT=$(gh pr create \
-            --title "chore: bump version to $VERSION [skip ci]" \
-            --body "$PR_BODY" \
-            --base main \
-            --head "$BRANCH_NAME" \
-            --label "automated,chore" 2>&1) || PR_EXIT_CODE=$?
+          PR_OUTPUT=$(eval "$PR_CMD" 2>&1) || PR_EXIT_CODE=$?
           
           if [ -z "$PR_EXIT_CODE" ] && [ -n "$PR_OUTPUT" ]; then
             # Extract PR number from output (format: "https://github.com/owner/repo/pull/123")
