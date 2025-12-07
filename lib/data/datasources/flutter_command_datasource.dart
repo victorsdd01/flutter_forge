@@ -175,8 +175,8 @@ class FlutterCommandDataSourceImpl implements FlutterCommandDataSource {
     
     try {
       print('');
-      print('${brightCyan}${bold}⏳ Please wait, we are setting up your project...${reset}');
-      print('${dim}   This may take a few moments${reset}');
+      print('$brightCyan$bold⏳ Please wait, we are setting up your project...$reset');
+      print('$dim   This may take a few moments$reset');
       print('');
       
       final result = await Process.run(
