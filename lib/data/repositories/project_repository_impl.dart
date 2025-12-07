@@ -47,6 +47,8 @@ class ProjectRepositoryImpl implements ProjectRepository {
       true
     );
 
+    await _fileSystemDataSource.ensureCleanArchitectureFiles(config.projectName);
+
     if (config.includeLinterRules) {
       await _fileSystemDataSource.createLinterRules(config.projectName);
     }

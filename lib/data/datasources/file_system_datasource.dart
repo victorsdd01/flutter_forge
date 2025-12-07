@@ -16,6 +16,7 @@ abstract class FileSystemDataSource {
   Future<void> createBarrelFiles(String projectName, StateManagementType stateManagement, bool includeCleanArchitecture, bool includeFreezed);
   Future<void> createBuildYaml(String projectName);
   Future<void> createInternationalization(String projectName);
+  Future<void> ensureCleanArchitectureFiles(String projectName);
 }
 
 /// Implementation of FileSystemDataSource
@@ -128,23 +129,96 @@ class FileSystemDataSourceImpl implements FileSystemDataSource {
       'intl_utils: ^2.8.10',
     ]);
 
-    // Replace dependencies section
-    if (dependencies.isNotEmpty) {
-      final dependenciesSection = 'dependencies:\n  ${dependencies.join('\n  ')}';
-      pubspecContent = pubspecContent.replaceFirst(
-        RegExp(r'dependencies:\s*\n'),
-        '$dependenciesSection\n'
-      );
+    final lines = pubspecContent.split('\n');
+    final newLines = <String>[];
+    bool skipUntilNextSection = false;
+    bool dependenciesAdded = false;
+    bool devDependenciesAdded = false;
+    
+    for (int i = 0; i < lines.length; i++) {
+      final line = lines[i];
+      final trimmedLine = line.trim();
+      
+      if (trimmedLine == 'dependencies:') {
+        skipUntilNextSection = true;
+        if (!dependenciesAdded) {
+          newLines.add('dependencies:');
+          for (final dep in dependencies) {
+            newLines.add('  $dep');
+          }
+          newLines.add('');
+          dependenciesAdded = true;
+        }
+        continue;
+      }
+      
+      if (trimmedLine == 'dev_dependencies:') {
+        skipUntilNextSection = true;
+        if (!devDependenciesAdded) {
+          newLines.add('dev_dependencies:');
+          for (final dep in devDependencies) {
+            newLines.add('  $dep');
+          }
+          newLines.add('');
+          devDependenciesAdded = true;
+        }
+        continue;
+      }
+      
+      if (skipUntilNextSection) {
+        if (trimmedLine.isEmpty || trimmedLine.startsWith('  ') || trimmedLine.startsWith('    ') || trimmedLine.startsWith('#')) {
+          continue;
+        } else {
+          skipUntilNextSection = false;
+        }
+      }
+      
+      if (trimmedLine == 'flutter:' && !dependenciesAdded) {
+        newLines.add('dependencies:');
+        for (final dep in dependencies) {
+          newLines.add('  $dep');
+        }
+        newLines.add('');
+        dependenciesAdded = true;
+      }
+      
+      if (trimmedLine == 'flutter:' && dependenciesAdded && !devDependenciesAdded) {
+        newLines.add('dev_dependencies:');
+        for (final dep in devDependencies) {
+          newLines.add('  $dep');
+        }
+        newLines.add('');
+        devDependenciesAdded = true;
+      }
+      
+      newLines.add(line);
     }
-
-    // Replace dev_dependencies section
-    if (devDependencies.isNotEmpty) {
-      final devDependenciesSection = 'dev_dependencies:\n  ${devDependencies.join('\n  ')}';
-      pubspecContent = pubspecContent.replaceFirst(
-        RegExp(r'dev_dependencies:\s*\n'),
-        '$devDependenciesSection\n'
-      );
+    
+    if (!dependenciesAdded) {
+      final flutterIndex = newLines.indexWhere((line) => line.trim() == 'flutter:');
+      if (flutterIndex != -1) {
+        newLines.insert(flutterIndex, '');
+        for (int i = dependencies.length - 1; i >= 0; i--) {
+          newLines.insert(flutterIndex, '  ${dependencies[i]}');
+        }
+        newLines.insert(flutterIndex, 'dependencies:');
+        dependenciesAdded = true;
+      }
     }
+    
+    if (!devDependenciesAdded && dependenciesAdded) {
+      final flutterIndex = newLines.indexWhere((line) => line.trim() == 'flutter:');
+      if (flutterIndex != -1) {
+        newLines.insert(flutterIndex, '');
+        for (int i = devDependencies.length - 1; i >= 0; i--) {
+          newLines.insert(flutterIndex, '  ${devDependencies[i]}');
+        }
+        newLines.insert(flutterIndex, 'dev_dependencies:');
+        devDependenciesAdded = true;
+      }
+    }
+    
+    pubspecContent = newLines.join('\n');
 
     pubspecFile.writeAsStringSync(pubspecContent);
 
@@ -219,6 +293,24 @@ flutter_intl:
         if (await mainFile.exists()) {
           await mainFile.delete();
         }
+        
+        final oldDiFile = File(path.join(projectName, 'lib/core/di/dependency_injection.dart'));
+        if (await oldDiFile.exists()) {
+          await oldDiFile.delete();
+        }
+        
+        final oldDiDir = Directory(path.join(projectName, 'lib/core/di'));
+        if (await oldDiDir.exists()) {
+          try {
+            final contents = await oldDiDir.list().toList();
+            if (contents.isEmpty) {
+              await oldDiDir.delete(recursive: true);
+            }
+          } catch (e) {
+            // Ignore errors
+          }
+        }
+        
         await templateGenerator.generateProjectTemplates(
           projectName: projectName,
           projectPath: projectName,
@@ -347,12 +439,16 @@ flutter_intl:
   }
 
   String _integrateCleanArchitecture(String baseContent, StateManagementType stateManagement) {
-    // Update imports to use Clean Architecture structure
-    if (!baseContent.contains('import \'core/di/dependency_injection.dart\';')) {
+    // Remove any old imports of core/di/dependency_injection.dart
+    baseContent = baseContent.replaceAll('import \'core/di/dependency_injection.dart\';', '');
+    baseContent = baseContent.replaceAll('import "core/di/dependency_injection.dart";', '');
+    
+    // Update imports to use Clean Architecture structure - use application/injector.dart
+    if (!baseContent.contains('import \'application/injector.dart\';')) {
       baseContent = baseContent.replaceFirst(
         'import \'package:flutter/material.dart\';',
         '''import 'package:flutter/material.dart';
-import 'core/di/dependency_injection.dart';'''
+import 'application/injector.dart';'''
       );
     }
 
@@ -904,9 +1000,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hydrated_bloc/hydrated_bloc.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/foundation.dart';
-import 'core/di/dependency_injection.dart';
-import 'presentation/blocs/sample_bloc.dart';
-import 'routes/app_router.dart';
+import 'application/injector.dart';
+import 'features/home/presentation/blocs/home_bloc/home_bloc.dart';
+import 'application/routes/routes.dart';
 import 'application/generated/l10n/app_localizations.dart';
 
 Future<void> main() async {
@@ -922,14 +1018,15 @@ Future<void> runMainApp() async {
   );
   Injector.init();
 
-  runApp(MultiBlocProvider(
-      providers: [
-        BlocProvider<SampleBloc>(
-          create: (BuildContext _) => Injector.get<SampleBloc>(),
+  runApp(
+    MultiBlocProvider(
+      providers: <SingleChildWidget>[
+        BlocProvider<HomeBloc>(
+          create: (BuildContext _) => Injector.get<HomeBloc>(),
         ),
       ],
-      child: const MyApp()
-    )
+      child: const MyApp(),
+    ),
   );
 }
 
@@ -938,11 +1035,9 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => MaterialApp.router(
-    theme: ThemeData(
-      colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-      useMaterial3: true,
-    ),
-    routerConfig: AppRouter.router,
+    theme: AppTheme.light,
+    themeMode: ThemeMode.light,
+    routerConfig: AppRoutes.router,
     localizationsDelegates: AppLocalizationsSetup.localizationsDelegates,
     supportedLocales: AppLocalizationsSetup.supportedLocales,
     debugShowCheckedModeBanner: kDebugMode,
@@ -963,22 +1058,44 @@ class MyApp extends StatelessWidget {
     return '''
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:go_router/go_router.dart';
-import 'presentation/blocs/main_bloc.dart';
-import 'routes/app_router.dart';
+import 'package:hydrated_bloc/hydrated_bloc.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:flutter/foundation.dart';
+import 'application/injector.dart';
+import 'features/home/presentation/blocs/home_bloc/home_bloc.dart';
+import 'application/routes/routes.dart';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  
-  runApp(MultiBlocProvider(
-    providers: [
-      BlocProvider<MainBloc>(
-        create: (context) => MainBloc(),
-      ),
-    ],
-    child: const MyApp(),
-  ));
+Future<void> main() async {
+  try {
+    WidgetsFlutterBinding.ensureInitialized();
+    if (kReleaseMode) {
+      debugPrintRebuildDirtyWidgets = false;
+      debugPrint = (String? message, {int? wrapWidth}) {};
+    }
+  } finally {
+    await runMainApp();
+  }
+}
+
+Future<void> runMainApp() async {
+  HydratedBloc.storage = await HydratedStorage.build(
+    storageDirectory: !kIsWeb
+        ? HydratedStorageDirectory((await getTemporaryDirectory()).path)
+        : HydratedStorageDirectory.web,
+  );
+
+  Injector.init();
+
+  runApp(
+    MultiBlocProvider(
+      providers: <SingleChildWidget>[
+        BlocProvider<HomeBloc>(
+          create: (BuildContext _) => Injector.get<HomeBloc>(),
+        ),
+      ],
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -986,12 +1103,13 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => MaterialApp.router(
-    title: 'Flutter App',
-    theme: ThemeData(
-      colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-      useMaterial3: true,
-    ),
-    routerConfig: AppRouter.router,
+    theme: AppTheme.light,
+    themeMode: ThemeMode.light,
+    routerConfig: AppRoutes.router,
+    locale: AppLocalizationsSetup.supportedLocales.last,
+    localizationsDelegates: AppLocalizationsSetup.localizationsDelegates,
+    supportedLocales: AppLocalizationsSetup.supportedLocales,
+    debugShowCheckedModeBanner: kDebugMode,
   );
 }
 ''';
@@ -1004,31 +1122,52 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hydrated_bloc/hydrated_bloc.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/foundation.dart';
-import 'core/di/dependency_injection.dart';
-import 'presentation/blocs/sample_bloc.dart';
-import 'presentation/pages/home_page.dart';
+import 'package:nested/nested.dart';
+import 'application/injector.dart';
+import 'features/home/presentation/blocs/home_bloc/home_bloc.dart';
+import 'core/services/talker_service.dart';
+import 'application/application.dart';
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await runMainApp();
+  try {
+    WidgetsFlutterBinding.ensureInitialized();
+    if (kReleaseMode) {
+      debugPrintRebuildDirtyWidgets = false;
+      debugPrint = (String? message, {int? wrapWidth}) {};
+    }
+  } finally {
+    await runMainApp();
+  }
 }
 
 Future<void> runMainApp() async {
   HydratedBloc.storage = await HydratedStorage.build(
-    storageDirectory: kIsWeb
-        ? HydratedStorageDirectory.web
-        : HydratedStorageDirectory((await getTemporaryDirectory()).path),
+    storageDirectory: !kIsWeb
+        ? HydratedStorageDirectory((await getTemporaryDirectory()).path)
+        : HydratedStorageDirectory.web,
   );
+
+  TalkerService.init();
+
   Injector.init();
 
-  runApp(MultiBlocProvider(
-      providers: [
-        BlocProvider<SampleBloc>(
-          create: (BuildContext _) => Injector.get<SampleBloc>(),
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details);
+  };
+
+  PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
+    return true;
+  };
+
+  runApp(
+    MultiBlocProvider(
+      providers: <SingleChildWidget>[
+        BlocProvider<HomeBloc>(
+          create: (BuildContext _) => Injector.get<HomeBloc>(),
         ),
       ],
-      child: const MyApp()
-    )
+      child: const MyApp(),
+    ),
   );
 }
 
@@ -1036,16 +1175,15 @@ class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
-      ),
-      home: const HomePage(),
-    );
-  }
+  Widget build(BuildContext context) => MaterialApp.router(
+    theme: AppTheme.light,
+    themeMode: ThemeMode.light,
+    routerConfig: AppRoutes.router,
+    locale: AppLocalizationsSetup.supportedLocales.last,
+    localizationsDelegates: AppLocalizationsSetup.localizationsDelegates,
+    supportedLocales: AppLocalizationsSetup.supportedLocales,
+    debugShowCheckedModeBanner: kDebugMode,
+  );
 }
 ''';
   }
@@ -1058,9 +1196,12 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hydrated_bloc/hydrated_bloc.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/foundation.dart';
-import 'presentation/blocs/counter_bloc.dart';
-import 'routes/app_router.dart';
-import 'application/generated/l10n/app_localizations.dart';
+import 'package:nested/nested.dart';
+import 'application/injector.dart';
+import 'features/home/presentation/blocs/home_bloc/home_bloc.dart';
+import 'application/routes/routes.dart';
+import 'core/services/talker_service.dart';
+import 'application/application.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -1069,19 +1210,32 @@ Future<void> main() async {
 
 Future<void> runMainApp() async {
   HydratedBloc.storage = await HydratedStorage.build(
-    storageDirectory: kIsWeb
-        ? HydratedStorageDirectory.web
-        : HydratedStorageDirectory((await getTemporaryDirectory()).path),
+    storageDirectory: !kIsWeb
+        ? HydratedStorageDirectory((await getTemporaryDirectory()).path)
+        : HydratedStorageDirectory.web,
   );
 
-  runApp(MultiBlocProvider(
-      providers: [
-        BlocProvider<CounterBloc>(
-          create: (BuildContext _) => CounterBloc(),
+  TalkerService.init();
+
+  Injector.init();
+
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details);
+  };
+
+  PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
+    return true;
+  };
+
+  runApp(
+    MultiBlocProvider(
+      providers: <SingleChildWidget>[
+        BlocProvider<HomeBloc>(
+          create: (BuildContext _) => Injector.get<HomeBloc>(),
         ),
       ],
-      child: const MyApp()
-    )
+      child: const MyApp(),
+    ),
   );
 }
 
@@ -1090,22 +1244,13 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => MaterialApp.router(
-    theme: ThemeData(
-      colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-      useMaterial3: true,
-    ),
-    routerConfig: AppRouter.router,
+    theme: AppTheme.light,
+    themeMode: ThemeMode.light,
+    routerConfig: AppRoutes.router,
+    locale: AppLocalizationsSetup.supportedLocales.last,
     localizationsDelegates: AppLocalizationsSetup.localizationsDelegates,
     supportedLocales: AppLocalizationsSetup.supportedLocales,
     debugShowCheckedModeBanner: kDebugMode,
-    themeAnimationCurve: Curves.easeInOut,
-    themeAnimationDuration: const Duration(milliseconds: 300),
-    themeAnimationStyle: AnimationStyle(
-      curve: Curves.easeInOut,
-      duration: const Duration(milliseconds: 300),
-      reverseCurve: Curves.easeInOut,
-      reverseDuration: const Duration(milliseconds: 300),
-    ),
   );
 }
 ''';
@@ -1119,31 +1264,52 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hydrated_bloc/hydrated_bloc.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/foundation.dart';
-import 'core/di/dependency_injection.dart';
-import 'presentation/blocs/sample_bloc.dart';
-import 'presentation/pages/home_page.dart';
+import 'package:nested/nested.dart';
+import 'application/injector.dart';
+import 'features/home/presentation/blocs/home_bloc/home_bloc.dart';
+import 'core/services/talker_service.dart';
+import 'application/application.dart';
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await runMainApp();
+  try {
+    WidgetsFlutterBinding.ensureInitialized();
+    if (kReleaseMode) {
+      debugPrintRebuildDirtyWidgets = false;
+      debugPrint = (String? message, {int? wrapWidth}) {};
+    }
+  } finally {
+    await runMainApp();
+  }
 }
 
 Future<void> runMainApp() async {
   HydratedBloc.storage = await HydratedStorage.build(
-    storageDirectory: kIsWeb
-        ? HydratedStorageDirectory.web
-        : HydratedStorageDirectory((await getTemporaryDirectory()).path),
+    storageDirectory: !kIsWeb
+        ? HydratedStorageDirectory((await getTemporaryDirectory()).path)
+        : HydratedStorageDirectory.web,
   );
+
+  TalkerService.init();
+
   Injector.init();
 
-  runApp(MultiBlocProvider(
-      providers: [
-        BlocProvider<SampleBloc>(
-          create: (BuildContext _) => Injector.get<SampleBloc>(),
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details);
+  };
+
+  PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
+    return true;
+  };
+
+  runApp(
+    MultiBlocProvider(
+      providers: <SingleChildWidget>[
+        BlocProvider<HomeBloc>(
+          create: (BuildContext _) => Injector.get<HomeBloc>(),
         ),
       ],
-      child: const MyApp()
-    )
+      child: const MyApp(),
+    ),
   );
 }
 
@@ -1151,16 +1317,15 @@ class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
-      ),
-      home: const HomePage(),
-    );
-  }
+  Widget build(BuildContext context) => MaterialApp.router(
+    theme: AppTheme.light,
+    themeMode: ThemeMode.light,
+    routerConfig: AppRoutes.router,
+    locale: AppLocalizationsSetup.supportedLocales.last,
+    localizationsDelegates: AppLocalizationsSetup.localizationsDelegates,
+    supportedLocales: AppLocalizationsSetup.supportedLocales,
+    debugShowCheckedModeBanner: kDebugMode,
+  );
 }
 ''';
     } else {
@@ -1170,8 +1335,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hydrated_bloc/hydrated_bloc.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/foundation.dart';
-import 'core/di/dependency_injection.dart';
-import 'presentation/blocs/counter_bloc.dart';
+import 'package:nested/nested.dart';
+import 'application/injector.dart';
+import 'features/home/presentation/blocs/home_bloc/home_bloc.dart';
+import 'core/services/talker_service.dart';
+import 'application/application.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -1180,20 +1348,32 @@ Future<void> main() async {
 
 Future<void> runMainApp() async {
   HydratedBloc.storage = await HydratedStorage.build(
-    storageDirectory: kIsWeb
-        ? HydratedStorageDirectory.web
-        : HydratedStorageDirectory((await getTemporaryDirectory()).path),
+    storageDirectory: !kIsWeb
+        ? HydratedStorageDirectory((await getTemporaryDirectory()).path)
+        : HydratedStorageDirectory.web,
   );
+
+  TalkerService.init();
+
   Injector.init();
 
-  runApp(MultiBlocProvider(
-      providers: [
-        BlocProvider<CounterBloc>(
-          create: (BuildContext _) => Injector.get<CounterBloc>(),
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details);
+  };
+
+  PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
+    return true;
+  };
+
+  runApp(
+    MultiBlocProvider(
+      providers: <SingleChildWidget>[
+        BlocProvider<HomeBloc>(
+          create: (BuildContext _) => Injector.get<HomeBloc>(),
         ),
       ],
-      child: const MyApp()
-    )
+      child: const MyApp(),
+    ),
   );
 }
 
@@ -1201,78 +1381,15 @@ class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
-      ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
-    );
-  }
-}
-
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  final String title;
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: Text(widget.title),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text(
-              'You have pushed the button this many times:',
-            ),
-            BlocBuilder<CounterBloc, CounterState>(
-              builder: (context, state) {
-                if (state is CounterLoaded) {
-                  return Text(
-                    '\${state.count}',
-                    style: Theme.of(context).textTheme.headlineMedium,
-                  );
-                }
-                return const Text('0');
-              },
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          FloatingActionButton(
-            onPressed: () {
-              context.read<CounterBloc>().add(DecrementCounter());
-            },
-            tooltip: 'Decrement',
-            child: const Icon(Icons.remove),
-          ),
-          const SizedBox(width: 16),
-          FloatingActionButton(
-            onPressed: () {
-              context.read<CounterBloc>().add(IncrementCounter());
-            },
-            tooltip: 'Increment',
-            child: const Icon(Icons.add),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => MaterialApp.router(
+    theme: AppTheme.light,
+    themeMode: ThemeMode.light,
+    routerConfig: AppRoutes.router,
+    locale: AppLocalizationsSetup.supportedLocales.last,
+    localizationsDelegates: AppLocalizationsSetup.localizationsDelegates,
+    supportedLocales: AppLocalizationsSetup.supportedLocales,
+    debugShowCheckedModeBanner: kDebugMode,
+  );
 }
 ''';
     }
@@ -1291,6 +1408,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Future<void> _createCleanArchitectureStructure(String projectName, StateManagementType stateManagement, bool includeGoRouter, bool includeFreezed) async {
     // Create Clean Architecture directory structure - only core, features are created by templates
+    // NOTE: Do NOT create lib/core/di/ - templates handle application/injector.dart
     final cleanArchDirectories = [
       'lib/core',
       'lib/core/constants',
@@ -1362,13 +1480,33 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Future<void> _createCleanArchitectureBaseFiles(String projectName, StateManagementType stateManagement, bool includeFreezed) async {
-    // Create base error classes
-    final errorFile = File(path.join(projectName, 'lib/core/errors/failures.dart'));
-    errorFile.writeAsStringSync(_generateFailuresContent());
-
-    // Create base constants
+    // Don't create files that templates will generate
+    // Templates handle: failures.dart, core files, features, application, etc.
+    // Only create app_constants.dart if it doesn't exist (templates don't include it)
     final constantsFile = File(path.join(projectName, 'lib/core/constants/app_constants.dart'));
-    constantsFile.writeAsStringSync(_generateAppConstantsContent());
+    if (!await constantsFile.exists()) {
+      constantsFile.writeAsStringSync(_generateAppConstantsContent());
+    }
+    
+    // Ensure lib/core/di/dependency_injection.dart does NOT exist in Clean Architecture
+    // Templates use application/injector.dart instead
+    final oldDiFile = File(path.join(projectName, 'lib/core/di/dependency_injection.dart'));
+    if (await oldDiFile.exists()) {
+      await oldDiFile.delete();
+    }
+    
+    // Also delete the directory if it's empty
+    final oldDiDir = Directory(path.join(projectName, 'lib/core/di'));
+    if (await oldDiDir.exists()) {
+      try {
+        final contents = await oldDiDir.list().toList();
+        if (contents.isEmpty) {
+          await oldDiDir.delete(recursive: true);
+        }
+      } catch (e) {
+        // Ignore errors when trying to delete directory
+      }
+    }
   }
 
 
@@ -2298,7 +2436,7 @@ import 'views/pages/home_page.dart';''';
     return '''
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'core/di/dependency_injection.dart';$imports$routerImports$localizationsImports$homePageImport
+import 'application/injector.dart';$imports$routerImports$localizationsImports$homePageImport
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -2341,6 +2479,26 @@ class MyApp extends StatelessWidget {
   }
 }
 ''';
+  }
+
+  @override
+  Future<void> ensureCleanArchitectureFiles(String projectName) async {
+    final oldDiFile = File(path.join(projectName, 'lib/core/di/dependency_injection.dart'));
+    if (await oldDiFile.exists()) {
+      await oldDiFile.delete();
+    }
+    
+    final oldDiDir = Directory(path.join(projectName, 'lib/core/di'));
+    if (await oldDiDir.exists()) {
+      try {
+        final contents = await oldDiDir.list().toList();
+        if (contents.isEmpty) {
+          await oldDiDir.delete(recursive: true);
+        }
+      } catch (e) {
+        // Ignore errors
+      }
+    }
   }
 
   String _generateMvvmHomePageContent(String projectName, StateManagementType stateManagement) {
