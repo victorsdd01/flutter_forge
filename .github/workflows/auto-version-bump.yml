@@ -31,14 +31,25 @@ jobs:
       - name: Check if version bump already done
         id: check_version_bump
         run: |
-          # Check if this PR already has a version bump commit
-          if git log --oneline --grep="chore: bump version" | head -1 | grep -q "chore: bump version"; then
+          # Get the base branch (main) and PR head SHA
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          
+          # Check if there's a version bump commit between base and head
+          # Only check commits in this PR, not the entire history
+          if git log --oneline "$BASE_SHA..$HEAD_SHA" --grep="chore: bump version" | grep -q "chore: bump version"; then
             echo "✅ Version bump already done in this PR, skipping..."
             echo "already_done=true" >> $GITHUB_OUTPUT
           else
             echo "Version bump needed"
             echo "already_done=false" >> $GITHUB_OUTPUT
           fi
+          
+          # Debug output
+          echo "Base SHA: $BASE_SHA"
+          echo "Head SHA: $HEAD_SHA"
+          echo "Commits in PR:"
+          git log --oneline "$BASE_SHA..$HEAD_SHA" | head -5
           
           # Always report success to GitHub (so the check passes even if already done)
           echo "✅ Version bump check completed successfully"
@@ -49,8 +60,24 @@ jobs:
         run: |
           # Fetch main branch to get current version
           git fetch origin main --quiet || true
+          
           # Get version from main branch (the version that will be released)
-          CURRENT_VERSION=$(git show origin/main:pubspec.yaml 2>/dev/null | grep "version:" | cut -d " " -f 2 | tr -d '\r' || grep "version:" pubspec.yaml | cut -d " " -f 2 | tr -d '\r')
+          # First try from main branch, fallback to current branch
+          CURRENT_VERSION=$(git show origin/main:pubspec.yaml 2>/dev/null | grep "^version:" | head -1 | sed 's/version:[[:space:]]*//' | tr -d '\r' || echo "")
+          
+          # If we couldn't get it from main, try current branch
+          if [ -z "$CURRENT_VERSION" ] || [ "$CURRENT_VERSION" = "" ]; then
+            CURRENT_VERSION=$(grep "^version:" pubspec.yaml | head -1 | sed 's/version:[[:space:]]*//' | tr -d '\r' || echo "")
+          fi
+          
+          # Validate version format (should be X.Y.Z)
+          if ! echo "$CURRENT_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+'; then
+            echo "❌ Error: Could not extract valid version. Got: '$CURRENT_VERSION'"
+            echo "📋 pubspec.yaml content:"
+            cat pubspec.yaml | grep -A 5 "version:"
+            exit 1
+          fi
+          
           echo "Current version (for release): $CURRENT_VERSION"
           echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
 
@@ -155,23 +182,61 @@ jobs:
         run: |
           CURRENT_VERSION="${{ steps.current_version.outputs.version }}"
           
+          # Validate current version format
+          if ! echo "$CURRENT_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+'; then
+            echo "❌ Error: Invalid version format: $CURRENT_VERSION"
+            exit 1
+          fi
+          
           # Parse version parts (ej: "1.10.0" -> "1", "10", "0")
-          MAJOR=$(echo $CURRENT_VERSION | cut -d '.' -f 1)
-          MINOR=$(echo $CURRENT_VERSION | cut -d '.' -f 2)
-          PATCH=$(echo $CURRENT_VERSION | cut -d '.' -f 3)
+          MAJOR=$(echo "$CURRENT_VERSION" | cut -d '.' -f 1)
+          MINOR=$(echo "$CURRENT_VERSION" | cut -d '.' -f 2)
+          PATCH=$(echo "$CURRENT_VERSION" | cut -d '.' -f 3)
+          
+          # Validate parsed parts are numbers
+          if ! [[ "$MAJOR" =~ ^[0-9]+$ ]] || ! [[ "$MINOR" =~ ^[0-9]+$ ]] || ! [[ "$PATCH" =~ ^[0-9]+$ ]]; then
+            echo "❌ Error: Could not parse version parts. Major: $MAJOR, Minor: $MINOR, Patch: $PATCH"
+            exit 1
+          fi
           
           # Increment patch version (1.10.0 -> 1.10.1)
           NEW_PATCH=$((PATCH + 1))
           NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
           
+          echo "Current version: $CURRENT_VERSION"
           echo "New version: $NEW_VERSION"
           echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
 
       - name: Update pubspec.yaml
         if: steps.check_version_bump.outputs.already_done == 'false'
         run: |
-          sed -i "s/version:.*/version: ${{ steps.new_version.outputs.version }}/" pubspec.yaml
-          echo "Updated pubspec.yaml:"
+          NEW_VERSION="${{ steps.new_version.outputs.version }}"
+          
+          # Validate new version format
+          if ! echo "$NEW_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+'; then
+            echo "❌ Error: Invalid new version format: $NEW_VERSION"
+            exit 1
+          fi
+          
+          # Update version in pubspec.yaml (handle both "version: X.Y.Z" and "version: X.Y.Z+1" formats)
+          if grep -q "^version:" pubspec.yaml; then
+            # Replace the version line, preserving any build number if present
+            sed -i "s/^version:[[:space:]]*[0-9]\+\.[0-9]\+\.[0-9]\+.*/version: $NEW_VERSION/" pubspec.yaml
+          else
+            echo "❌ Error: Could not find version line in pubspec.yaml"
+            exit 1
+          fi
+          
+          # Verify the update
+          UPDATED_VERSION=$(grep "^version:" pubspec.yaml | head -1 | sed 's/version:[[:space:]]*//' | tr -d '\r')
+          if [ "$UPDATED_VERSION" != "$NEW_VERSION" ]; then
+            echo "❌ Error: Version update failed. Expected: $NEW_VERSION, Got: $UPDATED_VERSION"
+            echo "📋 pubspec.yaml content:"
+            cat pubspec.yaml | grep -A 5 "version:"
+            exit 1
+          fi
+          
+          echo "✅ Updated pubspec.yaml:"
           grep "version:" pubspec.yaml
 
       - name: Update CHANGELOG.md
