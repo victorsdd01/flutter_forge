@@ -164,14 +164,20 @@ class VersionChecker {
     return null;
   }
   
-  /// Get the latest CLI version (tries releases first, then Git)
+  /// Get the latest CLI version (tries releases first, then Git, returns the newest)
   static Future<String?> getLatestCLIVersionAny() async {
     final releaseVersion = await getLatestCLIVersion();
-    if (releaseVersion != null) {
-      return releaseVersion;
+    final gitVersion = await getLatestCLIVersionFromGit();
+    
+    // If we have both versions, return the newest one
+    if (releaseVersion != null && gitVersion != null) {
+      return compareVersions(releaseVersion, gitVersion) >= 0 
+          ? releaseVersion 
+          : gitVersion;
     }
     
-    return await getLatestCLIVersionFromGit();
+    // If we only have one, return it
+    return releaseVersion ?? gitVersion;
   }
   
   /// Check if an update is available
