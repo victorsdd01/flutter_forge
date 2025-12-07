@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.10.2] - 2025-12-07
+
+### Changes
+- feat: enhance version retrieval logic to fallback on Git for current …
+
 ## [1.10.1] - 2025-12-07
 
 ### Changes
