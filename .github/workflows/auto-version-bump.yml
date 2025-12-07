@@ -2,31 +2,55 @@ name: Auto Version Bump
 
 on:
   pull_request:
-    types: [closed]
+    types: [opened, synchronize, reopened, ready_for_review]
     branches: [main]
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
   bump-version:
     if: |
-      github.event.pull_request.merged == true &&
       !contains(github.event.pull_request.title, '[skip ci]') &&
-      !contains(github.event.pull_request.title, 'chore: bump version')
+      !contains(github.event.pull_request.title, 'chore: bump version') &&
+      github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
           persist-credentials: true
 
+      - name: Check if version bump already done
+        id: check_version_bump
+        run: |
+          # Check if this PR already has a version bump commit
+          if git log --oneline --grep="chore: bump version" | head -1 | grep -q "chore: bump version"; then
+            echo "✅ Version bump already done in this PR, skipping..."
+            echo "already_done=true" >> $GITHUB_OUTPUT
+          else
+            echo "Version bump needed"
+            echo "already_done=false" >> $GITHUB_OUTPUT
+          fi
+          
+          # Always report success to GitHub (so the check passes even if already done)
+          echo "✅ Version bump check completed successfully"
+
       - name: Get current version (for release)
+        if: steps.check_version_bump.outputs.already_done == 'false'
         id: current_version
         run: |
-          CURRENT_VERSION=$(grep "version:" pubspec.yaml | cut -d " " -f 2 | tr -d '\r')
+          # Fetch main branch to get current version
+          git fetch origin main --quiet || true
+          # Get version from main branch (the version that will be released)
+          CURRENT_VERSION=$(git show origin/main:pubspec.yaml 2>/dev/null | grep "version:" | cut -d " " -f 2 | tr -d '\r' || grep "version:" pubspec.yaml | cut -d " " -f 2 | tr -d '\r')
           echo "Current version (for release): $CURRENT_VERSION"
           echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
 
@@ -59,11 +83,15 @@ jobs:
           } >> $GITHUB_OUTPUT
 
       - name: Configure Git
+        if: steps.check_version_bump.outputs.already_done == 'false'
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
+          git config --local pull.rebase false
+          git config --local pull.ff only
 
       - name: Extract release notes from CHANGELOG (current version)
+        if: steps.check_version_bump.outputs.already_done == 'false'
         id: release_notes
         run: |
           VERSION="${{ steps.current_version.outputs.version }}"
@@ -74,13 +102,22 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Create Git tag (current version)
+        if: steps.check_version_bump.outputs.already_done == 'false'
         run: |
           VERSION="${{ steps.current_version.outputs.version }}"
-          git tag -a "v$VERSION" -m "Release v$VERSION"
-          git push origin "v$VERSION"
-          echo "✅ Created and pushed tag v$VERSION"
+          TAG_NAME="v$VERSION"
+          
+          # Check if tag already exists
+          if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+            echo "⚠️ Tag $TAG_NAME already exists, skipping tag creation"
+          else
+            git tag -a "$TAG_NAME" -m "Release v$VERSION"
+            git push origin "$TAG_NAME"
+            echo "✅ Created and pushed tag $TAG_NAME"
+          fi
 
       - name: Create GitHub Release (current version)
+        if: steps.check_version_bump.outputs.already_done == 'false'
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ steps.current_version.outputs.version }}
@@ -113,6 +150,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Calculate new version
+        if: steps.check_version_bump.outputs.already_done == 'false'
         id: new_version
         run: |
           CURRENT_VERSION="${{ steps.current_version.outputs.version }}"
@@ -130,12 +168,14 @@ jobs:
           echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
 
       - name: Update pubspec.yaml
+        if: steps.check_version_bump.outputs.already_done == 'false'
         run: |
           sed -i "s/version:.*/version: ${{ steps.new_version.outputs.version }}/" pubspec.yaml
           echo "Updated pubspec.yaml:"
           grep "version:" pubspec.yaml
 
       - name: Update CHANGELOG.md
+        if: steps.check_version_bump.outputs.already_done == 'false'
         run: |
           VERSION="${{ steps.new_version.outputs.version }}"
           PR_TITLE="${{ steps.pr_info.outputs.pr_title }}"
@@ -216,17 +256,47 @@ jobs:
           echo "📋 New changelog entry preview:"
           head -n 25 CHANGELOG.md
 
-      - name: Commit and push version bump to main
+      - name: Commit and push version bump to PR branch
+        if: steps.check_version_bump.outputs.already_done == 'false'
         run: |
-          git checkout main
-          git pull origin main
+          # Ensure we're on the PR branch and it's up to date
+          BRANCH_NAME="${{ github.event.pull_request.head.ref }}"
+          git checkout "$BRANCH_NAME"
           
+          # Fetch latest changes from remote to avoid conflicts
+          git fetch origin "$BRANCH_NAME" --quiet || true
+          
+          # Try to merge/rebase any remote changes if they exist
+          if git rev-parse --verify "origin/$BRANCH_NAME" >/dev/null 2>&1; then
+            # Check if we're behind remote
+            LOCAL=$(git rev-parse HEAD)
+            REMOTE=$(git rev-parse "origin/$BRANCH_NAME" 2>/dev/null || echo "$LOCAL")
+            if [ "$LOCAL" != "$REMOTE" ]; then
+              echo "⚠️ Branch has remote changes, pulling with merge strategy..."
+              git pull origin "$BRANCH_NAME" --no-rebase --no-edit || {
+                echo "⚠️ Pull failed, but continuing with local changes..."
+              }
+            fi
+          fi
+          
+          # Check if version files have changed
+          if git diff --quiet pubspec.yaml CHANGELOG.md; then
+            echo "⚠️ No changes to version files, skipping commit"
+            exit 0
+          fi
+          
+          # Stage only the version files (preserve other changes)
           git add pubspec.yaml CHANGELOG.md
+          
+          # Commit the version bump
           git commit -m "chore: bump version to ${{ steps.new_version.outputs.version }} [skip ci]"
           
-          # Push to main
-          git push origin main
+          # Push to PR branch (force-with-lease to prevent overwriting others' work)
+          git push origin HEAD:"$BRANCH_NAME" --force-with-lease || {
+            echo "⚠️ Force-with-lease failed, trying regular push..."
+            git push origin HEAD:"$BRANCH_NAME"
+          }
           
-          echo "✅ Version bumped to ${{ steps.new_version.outputs.version }} and pushed to main"
+          echo "✅ Version bumped to ${{ steps.new_version.outputs.version }} and pushed to PR branch"
         env:
           GITHUB_TOKEN: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
