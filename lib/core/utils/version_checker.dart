@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:path/path.dart' as path;
 
 /// Utility class to check for the latest versions of Flutter packages
 class VersionChecker {
@@ -17,6 +19,67 @@ class VersionChecker {
   };
 
   static const String _githubApiUrl = 'https://api.github.com/repos/victorsdd01/flutter_forge/releases/latest';
+  
+  /// Get current version from pubspec.yaml
+  static String getCurrentVersion() {
+    try {
+      final pubspecPath = _findPubspecPath();
+      if (pubspecPath == null) {
+        return '1.0.0';
+      }
+      
+      final file = File(pubspecPath);
+      if (!file.existsSync()) {
+        return '1.0.0';
+      }
+      
+      final content = file.readAsStringSync();
+      final versionMatch = RegExp(r'version:\s*(\d+\.\d+\.\d+)').firstMatch(content);
+      if (versionMatch != null) {
+        return versionMatch.group(1)!;
+      }
+    } catch (e) {
+      // Fallback to default version
+    }
+    
+    return '1.0.0';
+  }
+  
+  /// Find pubspec.yaml path (works when installed globally or locally)
+  static String? _findPubspecPath() {
+    try {
+      final scriptPath = Platform.script.toFilePath();
+      final scriptDir = path.dirname(scriptPath);
+      final scriptDirNormalized = path.normalize(scriptDir);
+      
+      final possiblePaths = <String>[
+        path.join(scriptDirNormalized, 'pubspec.yaml'),
+        path.join(scriptDirNormalized, '..', 'pubspec.yaml'),
+        path.join(scriptDirNormalized, '..', '..', 'pubspec.yaml'),
+        path.join(scriptDirNormalized, '..', '..', '..', 'pubspec.yaml'),
+        path.join(scriptDirNormalized, '..', '..', '..', '..', 'pubspec.yaml'),
+        path.join(scriptDirNormalized, '..', '..', '..', '..', '..', 'pubspec.yaml'),
+        path.join(Directory.current.path, 'pubspec.yaml'),
+      ];
+      
+      for (final possiblePath in possiblePaths) {
+        final normalizedPath = path.normalize(possiblePath);
+        final file = File(normalizedPath);
+        if (file.existsSync()) {
+          return normalizedPath;
+        }
+      }
+    } catch (e) {
+      // Try alternative method
+    }
+    
+    final currentDirPubspec = File(path.join(Directory.current.path, 'pubspec.yaml'));
+    if (currentDirPubspec.existsSync()) {
+      return currentDirPubspec.path;
+    }
+    
+    return null;
+  }
   
   /// Get the latest version for a specific package
   static String getLatestVersion(String packageName) {
@@ -64,7 +127,10 @@ class VersionChecker {
       
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        return data['tag_name']?.toString().replaceFirst('v', '');
+        final tagName = data['tag_name']?.toString();
+        if (tagName != null) {
+          return tagName.replaceFirst('v', '');
+        }
       }
     } catch (e) {
       // Silently fail - network issues shouldn't break the CLI
@@ -73,16 +139,52 @@ class VersionChecker {
     return null;
   }
   
+  /// Get the latest CLI version from Git (fallback if no releases)
+  static Future<String?> getLatestCLIVersionFromGit() async {
+    try {
+      final response = await http.get(
+        Uri.parse('https://api.github.com/repos/victorsdd01/flutter_forge/contents/pubspec.yaml'),
+      );
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final content = data['content'] as String?;
+        if (content != null) {
+          final decodedContent = utf8.decode(base64Decode(content));
+          final versionMatch = RegExp(r'version:\s*(\d+\.\d+\.\d+)').firstMatch(decodedContent);
+          if (versionMatch != null) {
+            return versionMatch.group(1)!;
+          }
+        }
+      }
+    } catch (e) {
+      // Silently fail
+    }
+    
+    return null;
+  }
+  
+  /// Get the latest CLI version (tries releases first, then Git)
+  static Future<String?> getLatestCLIVersionAny() async {
+    final releaseVersion = await getLatestCLIVersion();
+    if (releaseVersion != null) {
+      return releaseVersion;
+    }
+    
+    return await getLatestCLIVersionFromGit();
+  }
+  
   /// Check if an update is available
   static Future<bool> isUpdateAvailable(String currentVersion) async {
     final latestVersion = await getLatestCLIVersion();
     if (latestVersion == null) return false;
     
-    return _compareVersions(currentVersion, latestVersion) < 0;
+    return compareVersions(currentVersion, latestVersion) < 0;
   }
   
   /// Compare two version strings
-  static int _compareVersions(String version1, String version2) {
+  /// Returns: -1 if version1 < version2, 0 if equal, 1 if version1 > version2
+  static int compareVersions(String version1, String version2) {
     final parts1 = version1.split('.').map(int.parse).toList();
     final parts2 = version2.split('.').map(int.parse).toList();
     

@@ -10,7 +10,9 @@ import 'presentation/controllers/cli_controller.dart';
 class FlutterForgeCLI {
   static const String _appName = 'flutterforge';
   static const String _description = 'A Flutter CLI tool for creating projects with interactive prompts.';
-  static const String _version = '1.10.0';
+  
+  /// Get current version from pubspec.yaml
+  static String get _version => VersionChecker.getCurrentVersion();
 
   late ArgParser _argParser;
   late ArgResults _argResults;
@@ -169,22 +171,26 @@ class FlutterForgeCLI {
 
   Future<void> _checkForUpdates() async {
     try {
-      final isUpdateAvailable = await VersionChecker.isUpdateAvailable(_version);
-      if (isUpdateAvailable) {
-        final latestVersion = await VersionChecker.getLatestCLIVersion();
+      final currentVersion = _version;
+      final latestVersion = await VersionChecker.getLatestCLIVersionAny();
+      
+      if (latestVersion != null) {
+        final isUpdateAvailable = VersionChecker.compareVersions(currentVersion, latestVersion) < 0;
         
-        // ANSI Color Codes
-        const String reset = '\x1B[0m';
-        const String bold = '\x1B[1m';
-        const String brightYellow = '\x1B[93m';
-        const String dim = '\x1B[2m';
-        
-        print('');
-        print('${brightYellow}${bold}🔄 Update Available!${reset}');
-        print('${dim}   Current: $_version${reset}');
-        print('${dim}   Latest:  $latestVersion${reset}');
-        print('${dim}   Run: flutterforge -u${reset} ${dim}or${reset} ${dim}flutterforge --update${reset}');
-        print('');
+        if (isUpdateAvailable) {
+          // ANSI Color Codes
+          const String reset = '\x1B[0m';
+          const String bold = '\x1B[1m';
+          const String brightYellow = '\x1B[93m';
+          const String dim = '\x1B[2m';
+          
+          print('');
+          print('${brightYellow}${bold}🔄 Update Available!${reset}');
+          print('${dim}   Current: $currentVersion${reset}');
+          print('${dim}   Latest:  $latestVersion${reset}');
+          print('${dim}   Run: flutterforge -u${reset} ${dim}or${reset} ${dim}flutterforge --update${reset}');
+          print('');
+        }
       }
     } catch (e) {
       // Silently fail - don't interrupt the user experience
@@ -212,19 +218,23 @@ class FlutterForgeCLI {
     print('${brightCyan}${bold}╚══════════════════════════════════════════════════════════════╝${reset}');
     print('');
     
-    print('${brightGreen}${bold}📦 Current version:${reset} ${brightYellow}$_version${reset}');
+    final currentVersion = _version;
+    print('${brightGreen}${bold}📦 Current version:${reset} ${brightYellow}$currentVersion${reset}');
     
-    // Check for latest version
-    final latestVersion = await VersionChecker.getLatestCLIVersion();
+    // Check for latest version (tries releases first, then Git)
+    final latestVersion = await VersionChecker.getLatestCLIVersionAny();
     if (latestVersion != null) {
       print('${brightGreen}${bold}📦 Latest version:${reset} ${brightYellow}$latestVersion${reset}');
       
-      if (latestVersion == _version) {
+      if (latestVersion == currentVersion) {
         print('');
         print('${brightGreen}${bold}✅ You already have the latest version!${reset}');
         print('');
         return;
       }
+    } else {
+      print('${brightYellow}${bold}⚠️  Could not check for latest version${reset}');
+      print('${dim}   Proceeding with update from main branch...${reset}');
     }
     
     print('');
