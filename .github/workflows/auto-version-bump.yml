@@ -1,0 +1,154 @@
+name: Auto Version Bump
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump-version:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Get current version
+        id: get_version
+        run: |
+          CURRENT_VERSION=$(grep "version:" pubspec.yaml | cut -d " " -f 2 | tr -d '\r')
+          echo "Current version: $CURRENT_VERSION"
+          
+          # Parse version parts (ej: "1.10.0" -> "1", "10", "0")
+          MAJOR=$(echo $CURRENT_VERSION | cut -d '.' -f 1)
+          MINOR=$(echo $CURRENT_VERSION | cut -d '.' -f 2)
+          PATCH=$(echo $CURRENT_VERSION | cut -d '.' -f 3)
+          
+          # Increment patch version (1.10.0 -> 1.10.1)
+          NEW_PATCH=$((PATCH + 1))
+          NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
+          
+          echo "New version: $NEW_VERSION"
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Get PR information
+        id: pr_info
+        run: |
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          PR_BODY="${{ github.event.pull_request.body }}"
+          PR_AUTHOR="${{ github.event.pull_request.user.login }}"
+          
+          echo "PR Title: $PR_TITLE"
+          echo "PR Author: $PR_AUTHOR"
+          
+          echo "pr_title=$PR_TITLE" >> $GITHUB_OUTPUT
+          echo "pr_body=$PR_BODY" >> $GITHUB_OUTPUT
+          echo "pr_author=$PR_AUTHOR" >> $GITHUB_OUTPUT
+
+      - name: Update pubspec.yaml
+        run: |
+          sed -i "s/version:.*/version: ${{ steps.get_version.outputs.version }}/" pubspec.yaml
+          echo "Updated pubspec.yaml:"
+          grep "version:" pubspec.yaml
+
+      - name: Update CHANGELOG.md
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          PR_TITLE="${{ steps.pr_info.outputs.pr_title }}"
+          PR_BODY="${{ steps.pr_info.outputs.pr_body }}"
+          DATE=$(date +%Y-%m-%d)
+          
+          # Clean PR title (remove version tags like [MINOR], [MAJOR], etc.)
+          CLEAN_TITLE=$(echo "$PR_TITLE" | sed 's/\[MINOR\]//g' | sed 's/\[MAJOR\]//g' | sed 's/\[PATCH\]//g' | sed 's/\[SKIP\]//g' | xargs)
+          
+          # Extract changelog content from PR body if it exists
+          CHANGELOG_CONTENT=""
+          if echo "$PR_BODY" | grep -qiE "## (Changelog|What's New|Changes)"; then
+            # Extract content between ## Changelog/What's New/Changes and next ##
+            CHANGELOG_CONTENT=$(echo "$PR_BODY" | sed -n '/## [Cc]hangelog\|## [Ww]hat'\''s [Nn]ew\|## [Cc]hanges/I,/^##/p' | sed '/^##/d' | sed '/^$/d' | head -n 10)
+          fi
+          
+          # If no changelog content found, use PR title
+          if [ -z "$CHANGELOG_CONTENT" ] || [ "$CHANGELOG_CONTENT" = "" ]; then
+            CHANGELOG_CONTENT="- $CLEAN_TITLE"
+          else
+            # Format the content properly (ensure each line starts with -)
+            CHANGELOG_CONTENT=$(echo "$CHANGELOG_CONTENT" | sed 's/^/- /' | sed 's/^- -/-/')
+          fi
+          
+          # Create Python script file
+          cat > /tmp/update_changelog.py << 'PYEOF'
+          import re
+          import sys
+          import os
+          
+          version = os.environ.get('VERSION', '')
+          date = os.environ.get('DATE', '')
+          changelog_content = os.environ.get('CHANGELOG_CONTENT', '')
+          
+          # Create new changelog entry
+          new_entry = f"""## [{version}] - {date}
+          
+          ### Changes
+          {changelog_content}
+          
+          """
+          
+          # Read current CHANGELOG
+          with open('CHANGELOG.md', 'r', encoding='utf-8') as f:
+              content = f.read()
+          
+          # Find [Unreleased] section and insert after it
+          if '## [Unreleased]' in content:
+              # Find the end of [Unreleased] section (after the last item before next ##)
+              pattern = r'(## \[Unreleased\].*?\n\n)'
+              match = re.search(pattern, content, re.DOTALL)
+              if match:
+                  # Insert new version after [Unreleased] section
+                  insert_pos = match.end()
+                  content = content[:insert_pos] + new_entry + content[insert_pos:]
+              else:
+                  # Fallback: insert after [Unreleased] line
+                  content = content.replace('## [Unreleased]', f'## [Unreleased]\n\n{new_entry}', 1)
+          else:
+              # Insert after header (after line 7)
+              lines = content.split('\n')
+              lines.insert(8, new_entry.strip())
+              content = '\n'.join(lines)
+          
+          # Write updated content
+          with open('CHANGELOG.md', 'w', encoding='utf-8') as f:
+              f.write(content)
+          
+          print(f"✅ Updated CHANGELOG.md with version {version}")
+          PYEOF
+          
+          # Execute Python script with environment variables
+          export VERSION="${{ steps.get_version.outputs.version }}"
+          export DATE="$DATE"
+          export CHANGELOG_CONTENT="$CHANGELOG_CONTENT"
+          python3 /tmp/update_changelog.py
+          
+          echo ""
+          echo "📋 New changelog entry preview:"
+          head -n 25 CHANGELOG.md
+
+      - name: Configure Git
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+
+      - name: Commit and push version bump
+        run: |
+          git checkout main
+          git add pubspec.yaml CHANGELOG.md
+          git commit -m "chore: bump version to ${{ steps.get_version.outputs.version }} [skip ci]"
+          git push
+

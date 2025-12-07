@@ -16,95 +16,59 @@ class ProjectRepositoryImpl implements ProjectRepository {
 
   @override
   Future<void> createProject(ProjectConfig config) async {
-            // Create Flutter project
-        await _flutterCommandDataSource.createFlutterProject(
-          projectName: config.projectName,
-          organizationName: config.organizationName,
-          platforms: config.platforms,
-          mobilePlatform: config.mobilePlatform,
-          desktopPlatform: config.desktopPlatform,
-          customDesktopPlatforms: config.customDesktopPlatforms,
-        );
+    await _flutterCommandDataSource.createFlutterProject(
+      projectName: config.projectName,
+      organizationName: config.organizationName,
+      platforms: config.platforms,
+      mobilePlatform: config.mobilePlatform,
+      desktopPlatform: config.desktopPlatform,
+      customDesktopPlatforms: config.customDesktopPlatforms,
+    );
 
-    // Add dependencies (both state management and Go Router if needed)
     await _fileSystemDataSource.addDependencies(
       config.projectName, 
-      config.stateManagement, 
-      config.includeGoRouter,
-      config.includeCleanArchitecture,
-      config.includeFreezed
+      StateManagementType.bloc, 
+      true,
+      true,
+      true
     );
 
-              // Create Clean Architecture structure FIRST if needed
-          if (config.includeCleanArchitecture) {
-            await _fileSystemDataSource.createCleanArchitectureStructure(
-              config.projectName, 
-              config.stateManagement,
-              includeGoRouter: config.includeGoRouter,
-              includeFreezed: config.includeFreezed,
-            );
-          }
-
-    // Create directory structure (only if not using Clean Architecture)
-    if (!config.includeCleanArchitecture) {
-      await _fileSystemDataSource.createDirectoryStructure(
-        config.projectName, 
-        config.stateManagement, 
-        config.includeGoRouter
-      );
-    }
-
-    // Create state management templates if needed
-    if (config.stateManagement != StateManagementType.none) {
-      await _fileSystemDataSource.createStateManagementTemplates(
-        config.projectName, 
-        config.stateManagement,
-        config.includeFreezed
-      );
-    }
-
-    // Create Go Router templates if needed
-    if (config.includeGoRouter) {
-      await _fileSystemDataSource.createGoRouterTemplates(config.projectName);
-    }
-
-    // Update main.dart with all configurations
-    await _fileSystemDataSource.updateMainFile(
+    await _fileSystemDataSource.createCleanArchitectureStructure(
       config.projectName, 
-      config.stateManagement, 
-      config.includeGoRouter,
-      config.includeCleanArchitecture,
-      config.includeFreezed
+      StateManagementType.bloc,
+      ArchitectureType.cleanArchitecture,
+      includeGoRouter: true,
+      includeFreezed: true,
     );
 
-    // Create linter rules if requested
+    await _fileSystemDataSource.createStateManagementTemplates(
+      config.projectName, 
+      StateManagementType.bloc,
+      true
+    );
+
+    await _fileSystemDataSource.ensureCleanArchitectureFiles(config.projectName);
+
     if (config.includeLinterRules) {
       await _fileSystemDataSource.createLinterRules(config.projectName);
     }
 
-    // Create build.yaml if Freezed is selected
-    if (config.includeFreezed) {
-      await _fileSystemDataSource.createBuildYaml(config.projectName);
-    }
+    await _fileSystemDataSource.createBuildYaml(config.projectName);
 
-    // Create internationalization setup
     await _fileSystemDataSource.createInternationalization(config.projectName);
 
-    // Generate localization files
     await _flutterCommandDataSource.generateLocalizationFiles(config.projectName);
 
-    // Clean build cache to prevent depfile issues
     await _flutterCommandDataSource.cleanBuildCache(config.projectName);
 
-    // Create barrel files if Clean Architecture is enabled
-    if (config.includeCleanArchitecture) {
-      await _fileSystemDataSource.createBarrelFiles(
-        config.projectName, 
-        config.stateManagement, 
-        config.includeCleanArchitecture,
-        config.includeFreezed
-      );
-    }
+    await _fileSystemDataSource.createBarrelFiles(
+      config.projectName, 
+      StateManagementType.bloc, 
+      true,
+      true
+    );
+
+    await _flutterCommandDataSource.runBuildRunner(config.projectName);
   }
 
   @override
@@ -114,7 +78,7 @@ class ProjectRepositoryImpl implements ProjectRepository {
     await _fileSystemDataSource.addDependencies(projectName, stateManagement, false, false, false);
 
     // Create directory structure
-    await _fileSystemDataSource.createDirectoryStructure(projectName, stateManagement, false);
+    await _fileSystemDataSource.createCleanArchitectureStructure(projectName, stateManagement, ArchitectureType.cleanArchitecture);
 
     // Create state management templates
     await _fileSystemDataSource.createStateManagementTemplates(projectName, stateManagement, false);
@@ -137,7 +101,7 @@ class ProjectRepositoryImpl implements ProjectRepository {
          Future<void> addCleanArchitecture(String projectName) async {
            // This method is called when Clean Architecture is added to an existing project
            // For now, we'll assume no state management when adding CA to existing project
-           await _fileSystemDataSource.createCleanArchitectureStructure(projectName, StateManagementType.none, includeFreezed: false);
+           await _fileSystemDataSource.createCleanArchitectureStructure(projectName, StateManagementType.none, ArchitectureType.cleanArchitecture, includeFreezed: false);
          }
 
   @override

@@ -1,12 +1,12 @@
 name: flutterforge
 description: A powerful Flutter CLI tool for creating projects with interactive prompts, supporting Clean Architecture, BLoC, Freezed, Go Router, and internationalization.
-version: 1.0.10
+version: 1.10.0
 homepage: https://github.com/victorsdd01/flutter_forge
 repository: https://github.com/victorsdd01/flutter_forge.git
 issue_tracker: https://github.com/victorsdd01/flutter_forge/issues
 
 environment:
-  sdk: ^3.8.0
+  sdk: '>=3.7.0 <4.0.0'
 
 # Add regular dependencies here.
 dependencies:
@@ -15,7 +15,7 @@ dependencies:
   http: ^1.2.0
 
 dev_dependencies:
-  lints: ^6.0.0
+  lints: ^5.1.1
   test: ^1.26.3
 
 # Export the main library

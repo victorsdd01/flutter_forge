@@ -17,6 +17,8 @@ abstract class FlutterCommandDataSource {
   Future<void> generateLocalizationFiles(String projectName);
   
   Future<void> cleanBuildCache(String projectName);
+  
+  Future<void> runBuildRunner(String projectName);
 }
 
 /// Implementation of FlutterCommandDataSource
@@ -127,8 +129,6 @@ class FlutterCommandDataSourceImpl implements FlutterCommandDataSource {
       final appLocalizationsFile = File('$projectName/lib/application/generated/l10n/app_localizations.dart');
       if (appLocalizationsFile.existsSync()) {
         String content = appLocalizationsFile.readAsStringSync();
-        print('Fixing app_localizations.dart import...');
-        print('Original content contains flutter_gen import: ${content.contains("package:flutter_gen/gen_l10n/app_localizations.dart")}');
         
         // Replace the wrong import with the correct one
         content = content.replaceFirst(
@@ -136,14 +136,10 @@ class FlutterCommandDataSourceImpl implements FlutterCommandDataSource {
           "import '../l10n.dart';"
         );
         
-        print('After replacement contains correct import: ${content.contains("../l10n.dart")}');
         appLocalizationsFile.writeAsStringSync(content);
-        print('Import fix completed successfully!');
-      } else {
-        print('Warning: app_localizations.dart file not found at expected location');
       }
     } catch (e) {
-      print('Warning: Failed to fix app_localizations.dart import: $e');
+      // Silently handle the error - this is not critical for the user experience
     }
   }
 
@@ -167,6 +163,37 @@ class FlutterCommandDataSourceImpl implements FlutterCommandDataSource {
       }
     } catch (e) {
       print('Warning: Failed to clean build cache: $e');
+    }
+  }
+
+  @override
+  Future<void> runBuildRunner(String projectName) async {
+    const String reset = '\x1B[0m';
+    const String bold = '\x1B[1m';
+    const String brightCyan = '\x1B[96m';
+    const String dim = '\x1B[2m';
+    
+    try {
+      print('');
+      print('$brightCyan$bold⏳ Please wait, we are setting up your project...$reset');
+      print('$dim   This may take a few moments$reset');
+      print('');
+      
+      final result = await Process.run(
+        'dart',
+        ['run', 'build_runner', 'build', '-d'],
+        workingDirectory: projectName,
+      );
+
+      if (result.exitCode == 0) {
+        // Success message will be shown in cli_controller after this completes
+      } else {
+        print('\n⚠️  Warning: build_runner completed with errors.');
+        print('   You may need to run "dart run build_runner build -d" manually.\n');
+      }
+    } catch (e) {
+      print('\n⚠️  Warning: Failed to run build_runner: $e');
+      print('   You may need to run "dart run build_runner build -d" manually.\n');
     }
   }
 }

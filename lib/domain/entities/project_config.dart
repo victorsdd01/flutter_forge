@@ -3,8 +3,8 @@ class ProjectConfig {
   final String projectName;
   final String organizationName;
   final StateManagementType stateManagement;
+  final ArchitectureType architecture;
   final bool includeGoRouter;
-  final bool includeCleanArchitecture;
   final bool includeLinterRules;
   final bool includeFreezed;
   final List<PlatformType> platforms;
@@ -16,8 +16,8 @@ class ProjectConfig {
     required this.projectName,
     required this.organizationName,
     required this.stateManagement,
+    required this.architecture,
     this.includeGoRouter = false,
-    this.includeCleanArchitecture = false,
     this.includeLinterRules = false,
     this.includeFreezed = false,
     this.platforms = const [PlatformType.mobile],
@@ -44,7 +44,7 @@ class ProjectConfig {
 
   @override
   String toString() {
-    return 'ProjectConfig(projectName: $projectName, organizationName: $organizationName, stateManagement: $stateManagement, includeGoRouter: $includeGoRouter, includeCleanArchitecture: $includeCleanArchitecture, includeLinterRules: $includeLinterRules, includeFreezed: $includeFreezed, platforms: $platforms, mobilePlatform: $mobilePlatform, desktopPlatform: $desktopPlatform, customDesktopPlatforms: $customDesktopPlatforms)';
+    return 'ProjectConfig(projectName: $projectName, organizationName: $organizationName, stateManagement: $stateManagement, architecture: $architecture, includeGoRouter: $includeGoRouter, includeLinterRules: $includeLinterRules, includeFreezed: $includeFreezed, platforms: $platforms, mobilePlatform: $mobilePlatform, desktopPlatform: $desktopPlatform, customDesktopPlatforms: $customDesktopPlatforms)';
   }
 
   @override
@@ -54,8 +54,8 @@ class ProjectConfig {
         other.projectName == projectName &&
         other.organizationName == organizationName &&
         other.stateManagement == stateManagement &&
+        other.architecture == architecture &&
         other.includeGoRouter == includeGoRouter &&
-        other.includeCleanArchitecture == includeCleanArchitecture &&
         other.includeLinterRules == includeLinterRules &&
         other.includeFreezed == includeFreezed &&
         other.platforms == platforms &&
@@ -69,14 +69,29 @@ class ProjectConfig {
     return projectName.hashCode ^
         organizationName.hashCode ^
         stateManagement.hashCode ^
+        architecture.hashCode ^
         includeGoRouter.hashCode ^
-        includeCleanArchitecture.hashCode ^
         includeLinterRules.hashCode ^
         includeFreezed.hashCode ^
         platforms.hashCode ^
         mobilePlatform.hashCode ^
         desktopPlatform.hashCode ^
         customDesktopPlatforms.hashCode;
+  }
+}
+
+/// Enum representing different architecture types
+enum ArchitectureType {
+  cleanArchitecture,
+  mvvm;
+
+  String get displayName {
+    switch (this) {
+      case ArchitectureType.cleanArchitecture:
+        return 'Clean Architecture';
+      case ArchitectureType.mvvm:
+        return 'MVVM';
+    }
   }
 }
 
@@ -177,7 +192,6 @@ class CustomDesktopPlatforms {
 /// Enum representing different state management types
 enum StateManagementType {
   bloc,
-  cubit,
   provider,
   none;
 
@@ -185,8 +199,6 @@ enum StateManagementType {
     switch (this) {
       case StateManagementType.bloc:
         return 'BLoC (Business Logic Component)';
-      case StateManagementType.cubit:
-        return 'Cubit (Simplified BLoC)';
       case StateManagementType.provider:
         return 'Provider';
       case StateManagementType.none:
@@ -198,8 +210,6 @@ enum StateManagementType {
     switch (this) {
       case StateManagementType.bloc:
         return 'bloc';
-      case StateManagementType.cubit:
-        return 'cubit';
       case StateManagementType.provider:
         return 'provider';
       case StateManagementType.none:

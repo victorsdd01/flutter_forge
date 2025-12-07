@@ -1,0 +1,8 @@
+{
+  "@@locale": "en",
+  "appTitle": "{{project_name}}",
+  "@appTitle": {
+    "description": "The application title"
+  }
+}
+

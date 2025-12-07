@@ -38,7 +38,7 @@ cd flutter_forge
 dart pub global activate --source path .
 ```
 
-### Option 3: Use Installation Scripts
+### Option 3: Use Installation Scripts (Recommended)
 
 #### **Windows**
 ```cmd
@@ -55,10 +55,13 @@ powershell -ExecutionPolicy Bypass -File install.ps1
 
 #### **macOS/Linux**
 ```bash
-# Using shell script
+# Using shell script (automatically configures PATH)
 git clone https://github.com/victorsdd01/flutter_forge.git
 cd flutter_forge
 ./install.sh
+
+# Verify installation
+./check_installation.sh
 ```
 
 ### Option 4: Install from Pub.dev (When Published)
@@ -320,6 +323,71 @@ flutterforge --version
 
 # Should show "command not found" or similar error
 ```
+
+## 🔧 Troubleshooting
+
+### **Command Not Found After Installation**
+
+If `flutterforge` command is not found after installation:
+
+1. **Restart your terminal** - The PATH changes take effect in new terminal sessions
+2. **Check PATH manually:**
+   ```bash
+   echo $PATH | grep pub-cache
+   ```
+3. **Add to PATH manually:**
+   ```bash
+   # For bash/zsh
+   export PATH="$PATH:$HOME/.pub-cache/bin"
+   
+   # Add to your shell config file (~/.bashrc, ~/.zshrc)
+   echo 'export PATH="$PATH:$HOME/.pub-cache/bin"' >> ~/.zshrc
+   ```
+4. **Verify installation:**
+   ```bash
+   ./check_installation.sh
+   ```
+
+### **Dart Version Compatibility**
+
+If you get version compatibility errors:
+
+1. **Check your Dart version:**
+   ```bash
+   dart --version
+   ```
+2. **Update Dart if needed:**
+   ```bash
+   # Using FVM (recommended)
+   fvm install stable
+   fvm use stable
+   
+   # Or download from dart.dev
+   ```
+
+### **Permission Issues**
+
+If you get permission errors:
+
+1. **Make scripts executable:**
+   ```bash
+   chmod +x install.sh
+   chmod +x check_installation.sh
+   ```
+2. **Check file permissions:**
+   ```bash
+   ls -la install.sh
+   ```
+
+### **Still Having Issues?**
+
+1. **Check the installation logs**
+2. **Try manual installation:**
+   ```bash
+   dart pub global activate --source path .
+   ```
+3. **Verify PATH configuration**
+4. **Open an issue on GitHub** with your error details
 
 ## 🤝 Contributing
 
