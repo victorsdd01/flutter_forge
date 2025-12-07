@@ -11,7 +11,10 @@ permissions:
 
 jobs:
   bump-version:
-    if: github.event.pull_request.merged == true
+    if: |
+      github.event.pull_request.merged == true &&
+      !contains(github.event.pull_request.title, '[skip ci]') &&
+      !contains(github.event.pull_request.title, 'chore: bump version')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -156,14 +159,92 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
 
-      - name: Commit and push version bump
+      - name: Create version bump branch and commit
+        id: version_bump
         run: |
-          git checkout main
+          VERSION="${{ steps.get_version.outputs.version }}"
+          BRANCH_NAME="chore/bump-version-$VERSION"
+          
+          # Create and checkout new branch
+          git checkout -b "$BRANCH_NAME"
+          
+          # Stage changes
           git add pubspec.yaml CHANGELOG.md
-          git commit -m "chore: bump version to ${{ steps.get_version.outputs.version }} [skip ci]"
-          git push
+          
+          # Commit changes
+          git commit -m "chore: bump version to $VERSION [skip ci]"
+          
+          # Push branch
+          git push origin "$BRANCH_NAME"
+          
+          echo "branch=$BRANCH_NAME" >> $GITHUB_OUTPUT
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ steps.version_bump.outputs.branch }}
+          base: main
+          title: "chore: bump version to ${{ steps.get_version.outputs.version }} [skip ci]"
+          body: |
+            This PR was automatically created to bump the version after merging PR #${{ github.event.pull_request.number }}.
+            
+            **Changes:**
+            - Updated `pubspec.yaml` version to `${{ steps.get_version.outputs.version }}`
+            - Updated `CHANGELOG.md` with new release entry
+            
+            This PR will be auto-merged if branch protection allows.
+          labels: |
+            automated
+            chore
+          delete-branch: true
+          commit-message: "chore: bump version to ${{ steps.get_version.outputs.version }} [skip ci]"
+        id: create_pr
+
+      - name: Auto-merge PR (if possible)
+        if: steps.create_pr.outputs.pull-request-number != ''
+        run: |
+          PR_NUMBER="${{ steps.create_pr.outputs.pull-request-number }}"
+          echo "Attempting to auto-merge PR #$PR_NUMBER..."
+          
+          # Try to merge the PR
+          if gh pr merge "$PR_NUMBER" --auto --squash; then
+            echo "✅ PR #$PR_NUMBER queued for auto-merge"
+            
+            # Wait and check if PR was merged (poll up to 30 seconds)
+            MAX_WAIT=30
+            WAITED=0
+            while [ $WAITED -lt $MAX_WAIT ]; do
+              sleep 2
+              WAITED=$((WAITED + 2))
+              PR_STATE=$(gh pr view "$PR_NUMBER" --json state --jq '.state')
+              if [ "$PR_STATE" = "MERGED" ]; then
+                echo "✅ PR #$PR_NUMBER successfully merged!"
+                echo "merged=true" >> $GITHUB_OUTPUT
+                
+                # Fetch latest changes
+                git fetch origin main
+                git checkout main
+                git pull origin main
+                break
+              fi
+              echo "Waiting for PR to merge... ($WAITED/$MAX_WAIT seconds)"
+            done
+            
+            if [ "$PR_STATE" != "MERGED" ]; then
+              echo "⚠️ PR #$PR_NUMBER not merged yet (may require manual approval or more time)"
+              echo "merged=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "⚠️ Could not auto-merge PR #$PR_NUMBER (may require manual approval)"
+            echo "merged=false" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        id: auto_merge
 
       - name: Extract release notes from CHANGELOG
+        if: steps.auto_merge.outputs.merged == 'true'
         id: release_notes
         run: |
           VERSION="${{ steps.get_version.outputs.version }}"
@@ -176,6 +257,7 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Create Git tag
+        if: steps.auto_merge.outputs.merged == 'true'
         run: |
           VERSION="${{ steps.get_version.outputs.version }}"
           git tag -a "v$VERSION" -m "Release v$VERSION"
@@ -183,6 +265,7 @@ jobs:
           echo "✅ Created and pushed tag v$VERSION"
 
       - name: Create GitHub Release
+        if: steps.auto_merge.outputs.merged == 'true'
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ steps.get_version.outputs.version }}
