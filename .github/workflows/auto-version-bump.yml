@@ -152,3 +152,54 @@ jobs:
           git commit -m "chore: bump version to ${{ steps.get_version.outputs.version }} [skip ci]"
           git push
 
+      - name: Extract release notes from CHANGELOG
+        id: release_notes
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          # Extract the changelog entry for this version
+          RELEASE_NOTES=$(awk "/^## \[$VERSION\]/,/^## \[/" CHANGELOG.md | sed '/^## \[/d' | sed '/^$/d' | head -n 20)
+          # Escape for JSON
+          RELEASE_NOTES_JSON=$(echo "$RELEASE_NOTES" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          echo "$RELEASE_NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create Git tag
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          git tag -a "v$VERSION" -m "Release v$VERSION"
+          git push origin "v$VERSION"
+          echo "✅ Created and pushed tag v$VERSION"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.get_version.outputs.version }}
+          name: FlutterForge CLI v${{ steps.get_version.outputs.version }}
+          body: |
+            ## 🚀 What's New in v${{ steps.get_version.outputs.version }}
+            
+            ${{ steps.release_notes.outputs.notes }}
+            
+            ---
+            
+            ### 📦 Installation
+            
+            ```bash
+            dart pub global activate --source git https://github.com/victorsdd01/flutter_forge.git
+            ```
+            
+            ### 🔄 Update
+            
+            ```bash
+            flutterforge --update
+            ```
+            
+            ### 📚 Full Changelog
+            
+            See [CHANGELOG.md](https://github.com/victorsdd01/flutter_forge/blob/main/CHANGELOG.md) for the complete list of changes.
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
