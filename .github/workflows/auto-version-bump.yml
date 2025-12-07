@@ -58,6 +58,11 @@ jobs:
             echo "EOF"
           } >> $GITHUB_OUTPUT
 
+      - name: Configure Git
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+
       - name: Extract release notes from CHANGELOG (current version)
         id: release_notes
         run: |
@@ -210,11 +215,6 @@ jobs:
           echo ""
           echo "📋 New changelog entry preview:"
           head -n 25 CHANGELOG.md
-
-      - name: Configure Git
-        run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
 
       - name: Commit and push version bump to main
         run: |
