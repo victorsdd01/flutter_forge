@@ -41,8 +41,9 @@ jobs:
         if: steps.check_version_bump.outputs.already_done == 'false'
         id: current_version
         run: |
+          # Fetch main branch to get current version
+          git fetch origin main --quiet || true
           # Get version from main branch (the version that will be released)
-          git fetch origin main:refs/remotes/origin/main
           CURRENT_VERSION=$(git show origin/main:pubspec.yaml 2>/dev/null | grep "version:" | cut -d " " -f 2 | tr -d '\r' || grep "version:" pubspec.yaml | cut -d " " -f 2 | tr -d '\r')
           echo "Current version (for release): $CURRENT_VERSION"
           echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
@@ -80,6 +81,8 @@ jobs:
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
+          git config --local pull.rebase false
+          git config --local pull.ff only
 
       - name: Extract release notes from CHANGELOG (current version)
         if: steps.check_version_bump.outputs.already_done == 'false'
