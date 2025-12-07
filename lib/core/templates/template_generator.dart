@@ -9,13 +9,13 @@ class TemplateGenerator {
 
   String? _packageRootPath;
 
-  String _getPackageRootPath() {
+  Future<String> _getPackageRootPath() async {
     if (_packageRootPath != null) {
       return _packageRootPath!;
     }
 
     try {
-      final packageUri = Isolate.resolvePackageUri(Uri.parse('package:flutterforge/core/templates/template_generator.dart'));
+      final packageUri = await Isolate.resolvePackageUri(Uri.parse('package:flutterforge/core/templates/template_generator.dart'));
       if (packageUri != null) {
         final packagePath = packageUri.toFilePath();
         final libDir = Directory(path.dirname(packagePath));
@@ -54,7 +54,7 @@ class TemplateGenerator {
     required String projectName,
     required String projectPath,
   }) async {
-    final packageRoot = _getPackageRootPath();
+    final packageRoot = await _getPackageRootPath();
     final templatePath = path.join(packageRoot, 'lib', 'core', 'templates', 'blocs');
     final libPath = '$projectPath/lib';
     await _copyTemplates(templatePath, libPath, projectName);
