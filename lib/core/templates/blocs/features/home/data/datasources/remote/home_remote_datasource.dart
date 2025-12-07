@@ -11,11 +11,11 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
   Future<Either<Failure, List<HomeModel>>> fetchData() async {
     try {
       await Future<void>.delayed(const Duration(seconds: 1));
-      final models = [
+      final List<HomeModel> models = <HomeModel>[
         const HomeModel(id: '1', title: 'Home Item 1', description: 'Description 1'),
         const HomeModel(id: '2', title: 'Home Item 2', description: 'Description 2'),
       ];
-      return Right(models);
+      return Right<Failure, List<HomeModel>>(models);
     } catch (e) {
       return Left<Failure, List<HomeModel>>(ServerFailure(message: 'Failed to fetch data: $e'));
     }

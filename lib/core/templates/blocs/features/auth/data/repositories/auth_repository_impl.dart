@@ -28,7 +28,7 @@ class AuthRepositoryImpl implements AuthRepository {
         if (model.token != null) {
           await secureStorageUtils.write('token', model.token!);
         }
-        return Right(UserEntity.fromModel(model));
+        return Right<Failure, UserEntity>(UserEntity.fromModel(model));
       },
     );
   }
@@ -43,7 +43,7 @@ class AuthRepositoryImpl implements AuthRepository {
         if (model.token != null) {
           await secureStorageUtils.write('token', model.token!);
         }
-        return Right(UserEntity.fromModel(model));
+        return Right<Failure, UserEntity>(UserEntity.fromModel(model));
       },
     );
   }
@@ -51,12 +51,12 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<Either<Failure, void>> logout() async {
     try {
-      final token = await secureStorageUtils.read('token');
+      final String? token = await secureStorageUtils.read('token');
       if (token != null) {
         await secureStorageUtils.delete('token');
       }
       await authLocalDataSource.clearUsers();
-      return const Right(null);
+      return const Right<Failure, void>(null);
     } catch (e) {
       return Left<Failure, void>(CacheFailure(message: 'Logout failed: $e'));
     }
@@ -65,9 +65,9 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<Either<Failure, UserEntity?>> getCurrentUser() async {
     try {
-      final token = await secureStorageUtils.read('token');
+      final String? token = await secureStorageUtils.read('token');
       if (token == null) {
-        return const Right(null);
+        return const Right<Failure, UserEntity?>(null);
       }
       
       final Either<Failure, List<UserModel>> allUsers = await authLocalDataSource.getAllUsers();
@@ -75,15 +75,15 @@ class AuthRepositoryImpl implements AuthRepository {
         (Failure failure) => Left<Failure, UserEntity?>(failure),
         (List<UserModel> users) {
           if (users.isEmpty) {
-            return const Right(null);
+            return const Right<Failure, UserEntity?>(null);
           }
           try {
             final UserModel user = users.firstWhere(
               (UserModel u) => u.token == token,
             );
-            return Right(UserEntity.fromModel(user));
+            return Right<Failure, UserEntity?>(UserEntity.fromModel(user));
           } catch (e) {
-            return const Right(null);
+            return const Right<Failure, UserEntity?>(null);
           }
         },
       );
@@ -96,7 +96,7 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<Either<Failure, bool>> isAuthenticated() async {
     try {
       final String? token = await secureStorageUtils.read('token');
-      return Right(token != null && token.isNotEmpty);
+      return Right<Failure, bool>(token != null && token.isNotEmpty);
     } catch (e) {
       return Left<Failure, bool>(CacheFailure(message: 'Failed to check authentication: $e'));
     }

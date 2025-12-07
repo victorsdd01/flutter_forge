@@ -15,7 +15,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     try {
       await Future<void>.delayed(const Duration(seconds: 1));
       
-      final mockUser = UserModel(
+      final UserModel mockUser = UserModel(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         email: email,
         name: email.split('@').first,
@@ -23,7 +23,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         createdAt: DateTime.now(),
       );
       
-      return Right(mockUser);
+      return Right<Failure, UserModel>(mockUser);
     } catch (e) {
       return Left<Failure, UserModel>(
         ServerFailure(message: 'Login failed: $e'),
@@ -36,7 +36,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     try {
       await Future<void>.delayed(const Duration(seconds: 1));
       
-      final mockUser = UserModel(
+      final UserModel mockUser = UserModel(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         email: email,
         name: name ?? email.split('@').first,
@@ -44,7 +44,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         createdAt: DateTime.now(),
       );
       
-      return Right(mockUser);
+      return Right<Failure, UserModel>(mockUser);
     } catch (e) {
       return Left<Failure, UserModel>(
         ServerFailure(message: 'Registration failed: $e'),

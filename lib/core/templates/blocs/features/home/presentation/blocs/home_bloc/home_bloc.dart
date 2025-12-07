@@ -1,4 +1,3 @@
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hydrated_bloc/hydrated_bloc.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:dartz/dartz.dart';
@@ -18,8 +17,8 @@ class HomeBloc extends HydratedBloc<HomeEvent, HomeState> {
   }) : _homeUseCases = homeUseCases,
        super(const HomeState()) {
     on<HomeEvent>((HomeEvent event, Emitter<HomeState> emit) async {
-      await event.map(
-        initialized: (e) async {
+      event.map(
+        initialized: (_Initialized e) async {
           emit(state.copyWith(isLoading: true, failure: null));
           final Either<Failure, List<HomeEntity>> result = await _homeUseCases.fetchData();
           result.fold(

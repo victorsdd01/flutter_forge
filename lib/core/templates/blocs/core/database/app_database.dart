@@ -14,7 +14,7 @@ class Users extends Table {
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 }
 
-@DriftDatabase(tables: [Users])
+@DriftDatabase(tables: <Type>[Users])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
@@ -22,38 +22,30 @@ class AppDatabase extends _$AppDatabase {
   int get schemaVersion => 1;
 
   Future<User?> getUserByEmail(String email) async {
-    final query = select(users)..where((u) => u.email.equals(email));
+    final SimpleSelectStatement<$UsersTable, User> query = select(users)..where((Users u) => u.email.equals(email));
     return await query.getSingleOrNull();
   }
 
-  Future<int> insertUser(UsersCompanion user) async {
-    return await into(users).insert(user);
-  }
+  Future<int> insertUser(UsersCompanion user) => into(users).insert(user);
 
   Future<bool> updateUser(User user) async {
-    await (update(users)..where((u) => u.id.equals(user.id))).replace(user);
+    await (update(users)..where((Users u) => u.id.equals(user.id))).replace(user);
     return true;
   }
 
   Future<bool> deleteUser(int id) async {
-    final deleted = await (delete(users)..where((u) => u.id.equals(id))).go();
+    final int deleted = await (delete(users)..where((Users u) => u.id.equals(id))).go();
     return deleted > 0;
   }
 
-  Future<void> clearUsers() async {
-    await delete(users).go();
-  }
+  Future<void> clearUsers() => delete(users).go();
 
-  Future<List<User>> getAllUsers() async {
-    return await select(users).get();
-  }
+  Future<List<User>> getAllUsers() => select(users).get();
 }
 
-LazyDatabase _openConnection() {
-  return LazyDatabase(() async {
-    final dbFolder = await getApplicationDocumentsDirectory();
-    final file = File(p.join(dbFolder.path, 'app.db'));
-    return NativeDatabase(file);
-  });
-}
+LazyDatabase _openConnection() => LazyDatabase(() async {
+  final Directory dbFolder = await getApplicationDocumentsDirectory();
+  final File file = File(p.join(dbFolder.path, 'app.db'));
+  return NativeDatabase(file);
+});
 

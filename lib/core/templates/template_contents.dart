@@ -17,7 +17,7 @@ class Users extends Table {
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 }
 
-@DriftDatabase(tables: [Users])
+@DriftDatabase(tables: <Type>[Users])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
@@ -25,40 +25,32 @@ class AppDatabase extends _$AppDatabase {
   int get schemaVersion => 1;
 
   Future<User?> getUserByEmail(String email) async {
-    final query = select(users)..where((u) => u.email.equals(email));
+    final SimpleSelectStatement<$UsersTable, User> query = select(users)..where((Users u) => u.email.equals(email));
     return await query.getSingleOrNull();
   }
 
-  Future<int> insertUser(UsersCompanion user) async {
-    return await into(users).insert(user);
-  }
+  Future<int> insertUser(UsersCompanion user) => into(users).insert(user);
 
   Future<bool> updateUser(User user) async {
-    await (update(users)..where((u) => u.id.equals(user.id))).replace(user);
+    await (update(users)..where((Users u) => u.id.equals(user.id))).replace(user);
     return true;
   }
 
   Future<bool> deleteUser(int id) async {
-    final deleted = await (delete(users)..where((u) => u.id.equals(id))).go();
+    final int deleted = await (delete(users)..where((Users u) => u.id.equals(id))).go();
     return deleted > 0;
   }
 
-  Future<void> clearUsers() async {
-    await delete(users).go();
-  }
+  Future<void> clearUsers() => delete(users).go();
 
-  Future<List<User>> getAllUsers() async {
-    return await select(users).get();
-  }
+  Future<List<User>> getAllUsers() => select(users).get();
 }
 
-LazyDatabase _openConnection() {
-  return LazyDatabase(() async {
-    final dbFolder = await getApplicationDocumentsDirectory();
-    final file = File(p.join(dbFolder.path, 'app.db'));
-    return NativeDatabase(file);
-  });
-}
+LazyDatabase _openConnection() => LazyDatabase(() async {
+  final Directory dbFolder = await getApplicationDocumentsDirectory();
+  final File file = File(p.join(dbFolder.path, 'app.db'));
+  return NativeDatabase(file);
+});
 
 ''';
   static const String _core_core_dart = r'''export 'errors/failures.dart';
@@ -78,7 +70,6 @@ import 'package:flutter/foundation.dart';
 import '../../application/injector.dart';
 import '../services/talker_service.dart';
 import '../utils/secure_storage_utils.dart';
-import '../enums/server_status.dart';
 import 'package:pretty_dio_logger/pretty_dio_logger.dart';
 import 'package:talker_dio_logger/talker_dio_logger.dart';
 
@@ -223,7 +214,7 @@ class HttpClient {
             
             return handler.next(error);
           }
-        } on RefreshTokenAuthException catch (refreshError) {
+        } on RefreshTokenAuthException {
           for (final _PendingRequest pendingRequest in _pendingRequests) {
             pendingRequest.completer.completeError(error);
           }
@@ -321,9 +312,7 @@ class HttpClient {
           break;
       }
       return response;
-    } on DioException catch (e) {
-      rethrow;
-    } catch (e) {
+    } on DioException {
       rethrow;
     }
   }
@@ -407,7 +396,7 @@ class _PendingRequest {
   static const String _core_utils_secure_storage_utils_dart = r'''import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class SecureStorageUtils {
-  static const _storage = FlutterSecureStorage(
+  static const FlutterSecureStorage _storage = FlutterSecureStorage(
     aOptions: AndroidOptions(
       encryptedSharedPreferences: true,
     ),
@@ -416,25 +405,15 @@ class SecureStorageUtils {
     ),
   );
 
-  Future<void> write(String key, String value) async {
-    await _storage.write(key: key, value: value);
-  }
+  Future<void> write(String key, String value) => _storage.write(key: key, value: value);
 
-  Future<String?> read(String key) async {
-    return await _storage.read(key: key);
-  }
+  Future<String?> read(String key) => _storage.read(key: key);
 
-  Future<void> delete(String key) async {
-    await _storage.delete(key: key);
-  }
+  Future<void> delete(String key) => _storage.delete(key: key);
 
-  Future<void> deleteAll() async {
-    await _storage.deleteAll();
-  }
+  Future<void> deleteAll() => _storage.deleteAll();
 
-  Future<Map<String, String>> readAll() async {
-    return await _storage.readAll();
-  }
+  Future<Map<String, String>> readAll() => _storage.readAll();
 }
 
 ''';
@@ -450,9 +429,7 @@ class ToastUtil {
 
 ''';
   static const String _core_utils_helpers_number_helper_dart = r'''class NumberHelper {
-  static String formatNumber(num value) {
-    return value.toStringAsFixed(2);
-  }
+  static String formatNumber(num value) => value.toStringAsFixed(2);
 }
 
 ''';
@@ -549,11 +526,11 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
   Future<Either<Failure, List<HomeModel>>> fetchData() async {
     try {
       await Future<void>.delayed(const Duration(seconds: 1));
-      final models = [
+      final List<HomeModel> models = <HomeModel>[
         const HomeModel(id: '1', title: 'Home Item 1', description: 'Description 1'),
         const HomeModel(id: '2', title: 'Home Item 2', description: 'Description 2'),
       ];
-      return Right(models);
+      return Right<Failure, List<HomeModel>>(models);
     } catch (e) {
       return Left<Failure, List<HomeModel>>(ServerFailure(message: 'Failed to fetch data: $e'));
     }
@@ -580,7 +557,7 @@ class HomeRepositoryImpl implements HomeRepository {
     final Either<Failure, List<HomeModel>> result = await homeRemoteDataSource.fetchData();
     return result.fold(
       (Failure failure) => Left<Failure, List<HomeEntity>>(failure),
-      (List<HomeModel> models) => Right(models.map((model) => HomeEntity.fromModel(model)).toList()),
+      (List<HomeModel> models) => Right<Failure, List<HomeEntity>>(models.map((HomeModel model) => HomeEntity.fromModel(model)).toList()),
     );
   }
 }
@@ -658,14 +635,13 @@ abstract class HomeEntity with _$HomeEntity {
 abstract class HomeState with _$HomeState {
   const factory HomeState({
     @Default(false) bool isLoading,
-    @Default([]) List<HomeEntity> items,
+    @Default(<HomeEntity>[]) List<HomeEntity> items,
     Failure? failure,
   }) = _HomeState;
 }
 
 ''';
-  static const String _features_home_presentation_blocs_home_bloc_home_bloc_dart = r'''import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:hydrated_bloc/hydrated_bloc.dart';
+  static const String _features_home_presentation_blocs_home_bloc_home_bloc_dart = r'''import 'package:hydrated_bloc/hydrated_bloc.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:dartz/dartz.dart';
 import '../../../../../core/errors/failures.dart';
@@ -684,8 +660,8 @@ class HomeBloc extends HydratedBloc<HomeEvent, HomeState> {
   }) : _homeUseCases = homeUseCases,
        super(const HomeState()) {
     on<HomeEvent>((HomeEvent event, Emitter<HomeState> emit) async {
-      await event.map(
-        initialized: (e) async {
+      event.map(
+        initialized: (_Initialized e) async {
           emit(state.copyWith(isLoading: true, failure: null));
           final Either<Failure, List<HomeEntity>> result = await _homeUseCases.fetchData();
           result.fold(
@@ -721,31 +697,29 @@ class HomeEvent with _$HomeEvent {
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../blocs/home_bloc/home_bloc.dart';
 import '../../../../application/injector.dart';
+import '../../domain/entities/home_entity.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (context) => Injector.get<HomeBloc>()..add(const HomeEvent.initialized()),
+  Widget build(BuildContext context) => BlocProvider<HomeBloc>(
+      create: (BuildContext context) => Injector.get<HomeBloc>()..add(const HomeEvent.initialized()),
       child: const HomeView(),
     );
-  }
 }
 
 class HomeView extends StatelessWidget {
   const HomeView({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
+  Widget build(BuildContext context) => Scaffold(
       appBar: AppBar(
         title: const Text('Home'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
       body: BlocBuilder<HomeBloc, HomeState>(
-        builder: (context, state) {
+        builder: (BuildContext context, HomeState state) {
           if (state.isLoading) {
             return const Center(child: CircularProgressIndicator());
           }
@@ -754,7 +728,7 @@ class HomeView extends StatelessWidget {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: [
+                children: <Widget>[
                   Text('Error: ${state.failure!.message}'),
                   ElevatedButton(
                     onPressed: () {
@@ -775,8 +749,8 @@ class HomeView extends StatelessWidget {
 
           return ListView.builder(
             itemCount: state.items.length,
-            itemBuilder: (context, index) {
-              final item = state.items[index];
+            itemBuilder: (BuildContext context, int index) {
+              final HomeEntity item = state.items[index];
               return ListTile(
                 title: Text(item.title),
                 subtitle: Text(item.description),
@@ -789,7 +763,6 @@ class HomeView extends StatelessWidget {
         },
       ),
     );
-  }
 }
 
 ''';
@@ -817,18 +790,18 @@ class AuthLocalDataSourceImpl implements AuthLocalDataSource {
   @override
   Future<Either<Failure, UserModel?>> getUserByEmail(String email) async {
     try {
-      final user = await _database.getUserByEmail(email);
+      final User? user = await _database.getUserByEmail(email);
       if (user == null) {
-        return const Right(null);
+        return const Right<Failure, UserModel?>(null);
       }
-      final model = UserModel(
+      final UserModel model = UserModel(
         id: user.id.toString(),
         email: user.email,
         name: user.name,
         token: user.token,
         createdAt: user.createdAt,
       );
-      return Right(model);
+      return Right<Failure, UserModel?>(model);
     } catch (e) {
       return Left<Failure, UserModel?>(CacheFailure(message: 'Failed to get user: $e'));
     }
@@ -837,7 +810,7 @@ class AuthLocalDataSourceImpl implements AuthLocalDataSource {
   @override
   Future<Either<Failure, void>> saveUser(UserModel user) async {
     try {
-      final existingUser = await _database.getUserByEmail(user.email);
+      final User? existingUser = await _database.getUserByEmail(user.email);
       if (existingUser != null) {
         await _database.updateUser(
           User(
@@ -851,13 +824,13 @@ class AuthLocalDataSourceImpl implements AuthLocalDataSource {
       } else {
         await _database.insertUser(
           UsersCompanion(
-            email: Value(user.email),
-            name: Value(user.name),
-            token: Value(user.token),
+            email: Value<String>(user.email),
+            name: Value<String?>(user.name),
+            token: Value<String?>(user.token),
           ),
         );
       }
-      return const Right(null);
+      return const Right<Failure, void>(null);
     } catch (e) {
       return Left<Failure, void>(CacheFailure(message: 'Failed to save user: $e'));
     }
@@ -867,7 +840,7 @@ class AuthLocalDataSourceImpl implements AuthLocalDataSource {
   Future<Either<Failure, void>> deleteUser(String userId) async {
     try {
       await _database.deleteUser(int.parse(userId));
-      return const Right(null);
+      return const Right<Failure, void>(null);
     } catch (e) {
       return Left<Failure, void>(CacheFailure(message: 'Failed to delete user: $e'));
     }
@@ -876,15 +849,15 @@ class AuthLocalDataSourceImpl implements AuthLocalDataSource {
   @override
   Future<Either<Failure, List<UserModel>>> getAllUsers() async {
     try {
-      final users = await _database.getAllUsers();
-      final models = users.map((user) => UserModel(
+      final List<User> users = await _database.getAllUsers();
+      final List<UserModel> models = users.map((User user) => UserModel(
         id: user.id.toString(),
         email: user.email,
         name: user.name,
         token: user.token,
         createdAt: user.createdAt,
       )).toList();
-      return Right(models);
+      return Right<Failure, List<UserModel>>(models);
     } catch (e) {
       return Left<Failure, List<UserModel>>(CacheFailure(message: 'Failed to get users: $e'));
     }
@@ -894,7 +867,7 @@ class AuthLocalDataSourceImpl implements AuthLocalDataSource {
   Future<Either<Failure, void>> clearUsers() async {
     try {
       await _database.clearUsers();
-      return const Right(null);
+      return const Right<Failure, void>(null);
     } catch (e) {
       return Left<Failure, void>(CacheFailure(message: 'Failed to clear users: $e'));
     }
@@ -919,7 +892,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     try {
       await Future<void>.delayed(const Duration(seconds: 1));
       
-      final mockUser = UserModel(
+      final UserModel mockUser = UserModel(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         email: email,
         name: email.split('@').first,
@@ -927,7 +900,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         createdAt: DateTime.now(),
       );
       
-      return Right(mockUser);
+      return Right<Failure, UserModel>(mockUser);
     } catch (e) {
       return Left<Failure, UserModel>(
         ServerFailure(message: 'Login failed: $e'),
@@ -940,7 +913,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     try {
       await Future<void>.delayed(const Duration(seconds: 1));
       
-      final mockUser = UserModel(
+      final UserModel mockUser = UserModel(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         email: email,
         name: name ?? email.split('@').first,
@@ -948,7 +921,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         createdAt: DateTime.now(),
       );
       
-      return Right(mockUser);
+      return Right<Failure, UserModel>(mockUser);
     } catch (e) {
       return Left<Failure, UserModel>(
         ServerFailure(message: 'Registration failed: $e'),
@@ -988,7 +961,7 @@ class AuthRepositoryImpl implements AuthRepository {
         if (model.token != null) {
           await secureStorageUtils.write('token', model.token!);
         }
-        return Right(UserEntity.fromModel(model));
+        return Right<Failure, UserEntity>(UserEntity.fromModel(model));
       },
     );
   }
@@ -1003,7 +976,7 @@ class AuthRepositoryImpl implements AuthRepository {
         if (model.token != null) {
           await secureStorageUtils.write('token', model.token!);
         }
-        return Right(UserEntity.fromModel(model));
+        return Right<Failure, UserEntity>(UserEntity.fromModel(model));
       },
     );
   }
@@ -1011,12 +984,12 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<Either<Failure, void>> logout() async {
     try {
-      final token = await secureStorageUtils.read('token');
+      final String? token = await secureStorageUtils.read('token');
       if (token != null) {
         await secureStorageUtils.delete('token');
       }
       await authLocalDataSource.clearUsers();
-      return const Right(null);
+      return const Right<Failure, void>(null);
     } catch (e) {
       return Left<Failure, void>(CacheFailure(message: 'Logout failed: $e'));
     }
@@ -1025,9 +998,9 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<Either<Failure, UserEntity?>> getCurrentUser() async {
     try {
-      final token = await secureStorageUtils.read('token');
+      final String? token = await secureStorageUtils.read('token');
       if (token == null) {
-        return const Right(null);
+        return const Right<Failure, UserEntity?>(null);
       }
       
       final Either<Failure, List<UserModel>> allUsers = await authLocalDataSource.getAllUsers();
@@ -1035,15 +1008,15 @@ class AuthRepositoryImpl implements AuthRepository {
         (Failure failure) => Left<Failure, UserEntity?>(failure),
         (List<UserModel> users) {
           if (users.isEmpty) {
-            return const Right(null);
+            return const Right<Failure, UserEntity?>(null);
           }
           try {
             final UserModel user = users.firstWhere(
               (UserModel u) => u.token == token,
             );
-            return Right(UserEntity.fromModel(user));
+            return Right<Failure, UserEntity?>(UserEntity.fromModel(user));
           } catch (e) {
-            return const Right(null);
+            return const Right<Failure, UserEntity?>(null);
           }
         },
       );
@@ -1056,7 +1029,7 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<Either<Failure, bool>> isAuthenticated() async {
     try {
       final String? token = await secureStorageUtils.read('token');
-      return Right(token != null && token.isNotEmpty);
+      return Right<Failure, bool>(token != null && token.isNotEmpty);
     } catch (e) {
       return Left<Failure, bool>(CacheFailure(message: 'Failed to check authentication: $e'));
     }
@@ -1108,25 +1081,15 @@ class AuthUseCases {
 
   final AuthRepository _authRepository;
 
-  Future<Either<Failure, UserEntity>> login(String email, String password) async {
-    return await _authRepository.login(email, password);
-  }
+  Future<Either<Failure, UserEntity>> login(String email, String password) => _authRepository.login(email, password);
 
-  Future<Either<Failure, UserEntity>> register(String email, String password, String? name) async {
-    return await _authRepository.register(email, password, name);
-  }
+  Future<Either<Failure, UserEntity>> register(String email, String password, String? name) => _authRepository.register(email, password, name);
 
-  Future<Either<Failure, void>> logout() async {
-    return await _authRepository.logout();
-  }
+  Future<Either<Failure, void>> logout() => _authRepository.logout();
 
-  Future<Either<Failure, UserEntity?>> getCurrentUser() async {
-    return await _authRepository.getCurrentUser();
-  }
+  Future<Either<Failure, UserEntity?>> getCurrentUser() => _authRepository.getCurrentUser();
 
-  Future<Either<Failure, bool>> isAuthenticated() async {
-    return await _authRepository.isAuthenticated();
-  }
+  Future<Either<Failure, bool>> isAuthenticated() => _authRepository.isAuthenticated();
 }
 
 ''';
@@ -1169,8 +1132,7 @@ class AuthEvent with _$AuthEvent {
 }
 
 ''';
-  static const String _features_auth_presentation_blocs_auth_bloc_auth_bloc_dart = r'''import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:hydrated_bloc/hydrated_bloc.dart';
+  static const String _features_auth_presentation_blocs_auth_bloc_auth_bloc_dart = r'''import 'package:hydrated_bloc/hydrated_bloc.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:dartz/dartz.dart';
 import '../../../../../core/errors/failures.dart';
@@ -1189,8 +1151,8 @@ class AuthBloc extends HydratedBloc<AuthEvent, AuthState> {
   }) : _authUseCases = authUseCases,
        super(const AuthState()) {
     on<AuthEvent>((AuthEvent event, Emitter<AuthState> emit) async {
-      await event.map(
-        login: (e) async {
+      event.map(
+        login: (_Login e) async {
           emit(state.copyWith(isLoading: true, failure: null));
           final Either<Failure, UserEntity> result = await _authUseCases.login(e.email, e.password);
           result.fold(
@@ -1207,7 +1169,7 @@ class AuthBloc extends HydratedBloc<AuthEvent, AuthState> {
             ),
           );
         },
-        register: (e) async {
+        register: (_Register e) async {
           emit(state.copyWith(isLoading: true, failure: null));
           final Either<Failure, UserEntity> result = await _authUseCases.register(e.email, e.password, e.name);
           result.fold(
@@ -1224,14 +1186,14 @@ class AuthBloc extends HydratedBloc<AuthEvent, AuthState> {
             ),
           );
         },
-        logout: (e) async {
+        logout: (_Logout e) async {
           emit(state.copyWith(isLoading: true, failure: null));
           final Either<Failure, void> result = await _authUseCases.logout();
           result.fold(
             (Failure failure) => emit(
               state.copyWith(failure: failure, isLoading: false),
             ),
-            (_) => emit(
+            (void _) => emit(
               state.copyWith(
                 user: null,
                 isLoading: false,
@@ -1241,7 +1203,7 @@ class AuthBloc extends HydratedBloc<AuthEvent, AuthState> {
             ),
           );
         },
-        checkAuth: (e) async {
+        checkAuth: (_CheckAuth e) async {
           emit(state.copyWith(isLoading: true, failure: null));
           final Either<Failure, bool> result = await _authUseCases.isAuthenticated();
           result.fold(
@@ -1309,16 +1271,16 @@ class LoginPage extends StatelessWidget {
   
   @override
   Widget build(BuildContext context) {
-    final formKey = GlobalKey<FormBuilderState>();
+    final GlobalKey<FormBuilderState> formKey = GlobalKey<FormBuilderState>();
 
-    return BlocProvider(
-      create: (context) => Injector.get<AuthBloc>()..add(const AuthEvent.checkAuth()),
+    return BlocProvider<AuthBloc>(
+      create: (BuildContext context) => Injector.get<AuthBloc>()..add(const AuthEvent.checkAuth()),
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Login'),
         ),
         body: BlocConsumer<AuthBloc, AuthState>(
-          listener: (context, state) {
+          listener: (BuildContext context, AuthState state) {
             if (state.isAuthenticated && state.user != null) {
               context.go(Routes.home);
             }
@@ -1331,14 +1293,13 @@ class LoginPage extends StatelessWidget {
               );
             }
           },
-          builder: (context, state) {
-            return SingleChildScrollView(
+          builder: (BuildContext context, AuthState state) => SingleChildScrollView(
               padding: const EdgeInsets.all(16.0),
               child: FormBuilder(
                 key: formKey,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
+                  children: <Widget>[
                     const SizedBox(height: 32),
                     const Text(
                       'Welcome Back',
@@ -1366,7 +1327,7 @@ class LoginPage extends StatelessWidget {
                         prefixIcon: Icon(Icons.email),
                       ),
                       keyboardType: TextInputType.emailAddress,
-                      validator: FormBuilderValidators.compose([
+                      validator: FormBuilderValidators.compose(<String? Function(String?)>[
                         FormBuilderValidators.required(),
                         FormBuilderValidators.email(),
                       ]),
@@ -1380,7 +1341,7 @@ class LoginPage extends StatelessWidget {
                         prefixIcon: Icon(Icons.lock),
                       ),
                       obscureText: true,
-                      validator: FormBuilderValidators.compose([
+                      validator: FormBuilderValidators.compose(<String? Function(String?)>[
                         FormBuilderValidators.required(),
                         FormBuilderValidators.minLength(6),
                       ]),
@@ -1391,8 +1352,8 @@ class LoginPage extends StatelessWidget {
                           ? null
                           : () {
                               if (formKey.currentState?.saveAndValidate() ?? false) {
-                                final email = formKey.currentState?.value['email'] as String;
-                                final password = formKey.currentState?.value['password'] as String;
+                                final String email = formKey.currentState?.value['email'] as String;
+                                final String password = formKey.currentState?.value['password'] as String;
                                 context.read<AuthBloc>().add(
                                       AuthEvent.login(email, password),
                                     );
@@ -1419,8 +1380,7 @@ class LoginPage extends StatelessWidget {
                   ],
                 ),
               ),
-            );
-          },
+            ),
         ),
       ),
     );
@@ -1428,33 +1388,7 @@ class LoginPage extends StatelessWidget {
 }
 
 ''';
-  static const String _shared_shared_dart = r'''export 'pages/server_unavailable_page.dart';
-export 'widgets/widgets.dart';
-
-''';
-  static const String _shared_pages_server_unavailable_page_dart = r'''import 'package:flutter/material.dart';
-
-class ServerUnavailablePage extends StatelessWidget {
-  const ServerUnavailablePage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline, size: 64, color: Colors.red),
-            SizedBox(height: 16),
-            Text('Server Unavailable', style: TextStyle(fontSize: 24)),
-            SizedBox(height: 8),
-            Text('Please try again later'),
-          ],
-        ),
-      ),
-    );
-  }
-}
+  static const String _shared_shared_dart = r'''export 'widgets/widgets.dart';
 
 ''';
   static const String _shared_widgets_widgets_dart = r'''export 'app_header.dart';
@@ -1467,11 +1401,9 @@ class AppHeader extends StatelessWidget {
   const AppHeader({super.key, required this.title});
 
   @override
-  Widget build(BuildContext context) {
-    return AppBar(
+  Widget build(BuildContext context) => AppBar(
       title: Text(title),
     );
-  }
 }
 
 ''';
@@ -1483,7 +1415,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:hydrated_bloc/hydrated_bloc.dart';
 
 import 'application/application.dart';
-import 'application/injector.dart';
 import 'features/home/presentation/blocs/home_bloc/home_bloc.dart';
 import 'features/auth/presentation/blocs/auth_bloc/auth_bloc.dart';
 import 'core/services/talker_service.dart';
@@ -1515,9 +1446,7 @@ Future<void> runMainApp() async {
     FlutterError.presentError(details);
   };
 
-  PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
-    return true;
-  };
+  PlatformDispatcher.instance.onError = (Object error, StackTrace stack) => true;
 
   runApp(
     MultiBlocProvider(
@@ -1732,7 +1661,6 @@ class AppTheme {
 
 ''';
   static const String _application_routes_routes_dart = r'''import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/home/presentation/pages/home_page.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
@@ -1811,7 +1739,6 @@ class AppRoutes {
     'features/auth/presentation/blocs/auth_bloc/auth_state.dart': _features_auth_presentation_blocs_auth_bloc_auth_state_dart,
     'features/auth/presentation/pages/login_page.dart': _features_auth_presentation_pages_login_page_dart,
     'shared/shared.dart': _shared_shared_dart,
-    'shared/pages/server_unavailable_page.dart': _shared_pages_server_unavailable_page_dart,
     'shared/widgets/widgets.dart': _shared_widgets_widgets_dart,
     'shared/widgets/app_header.dart': _shared_widgets_app_header_dart,
     'main.dart': _main_dart,

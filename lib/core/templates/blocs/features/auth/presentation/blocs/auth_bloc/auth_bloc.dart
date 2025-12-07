@@ -1,4 +1,3 @@
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hydrated_bloc/hydrated_bloc.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:dartz/dartz.dart';
@@ -18,8 +17,8 @@ class AuthBloc extends HydratedBloc<AuthEvent, AuthState> {
   }) : _authUseCases = authUseCases,
        super(const AuthState()) {
     on<AuthEvent>((AuthEvent event, Emitter<AuthState> emit) async {
-      await event.map(
-        login: (e) async {
+      event.map(
+        login: (_Login e) async {
           emit(state.copyWith(isLoading: true, failure: null));
           final Either<Failure, UserEntity> result = await _authUseCases.login(e.email, e.password);
           result.fold(
@@ -36,7 +35,7 @@ class AuthBloc extends HydratedBloc<AuthEvent, AuthState> {
             ),
           );
         },
-        register: (e) async {
+        register: (_Register e) async {
           emit(state.copyWith(isLoading: true, failure: null));
           final Either<Failure, UserEntity> result = await _authUseCases.register(e.email, e.password, e.name);
           result.fold(
@@ -53,14 +52,14 @@ class AuthBloc extends HydratedBloc<AuthEvent, AuthState> {
             ),
           );
         },
-        logout: (e) async {
+        logout: (_Logout e) async {
           emit(state.copyWith(isLoading: true, failure: null));
           final Either<Failure, void> result = await _authUseCases.logout();
           result.fold(
             (Failure failure) => emit(
               state.copyWith(failure: failure, isLoading: false),
             ),
-            (_) => emit(
+            (void _) => emit(
               state.copyWith(
                 user: null,
                 isLoading: false,
@@ -70,7 +69,7 @@ class AuthBloc extends HydratedBloc<AuthEvent, AuthState> {
             ),
           );
         },
-        checkAuth: (e) async {
+        checkAuth: (_CheckAuth e) async {
           emit(state.copyWith(isLoading: true, failure: null));
           final Either<Failure, bool> result = await _authUseCases.isAuthenticated();
           result.fold(

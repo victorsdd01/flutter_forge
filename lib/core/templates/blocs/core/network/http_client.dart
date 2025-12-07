@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import '../../application/injector.dart';
 import '../services/talker_service.dart';
 import '../utils/secure_storage_utils.dart';
-import '../enums/server_status.dart';
 import 'package:pretty_dio_logger/pretty_dio_logger.dart';
 import 'package:talker_dio_logger/talker_dio_logger.dart';
 
@@ -149,7 +148,7 @@ class HttpClient {
             
             return handler.next(error);
           }
-        } on RefreshTokenAuthException catch (refreshError) {
+        } on RefreshTokenAuthException {
           for (final _PendingRequest pendingRequest in _pendingRequests) {
             pendingRequest.completer.completeError(error);
           }
@@ -247,9 +246,7 @@ class HttpClient {
           break;
       }
       return response;
-    } on DioException catch (e) {
-      rethrow;
-    } catch (e) {
+    } on DioException {
       rethrow;
     }
   }

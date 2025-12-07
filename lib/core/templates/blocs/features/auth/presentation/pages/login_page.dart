@@ -12,16 +12,16 @@ class LoginPage extends StatelessWidget {
   
   @override
   Widget build(BuildContext context) {
-    final formKey = GlobalKey<FormBuilderState>();
+    final GlobalKey<FormBuilderState> formKey = GlobalKey<FormBuilderState>();
 
-    return BlocProvider(
-      create: (context) => Injector.get<AuthBloc>()..add(const AuthEvent.checkAuth()),
+    return BlocProvider<AuthBloc>(
+      create: (BuildContext context) => Injector.get<AuthBloc>()..add(const AuthEvent.checkAuth()),
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Login'),
         ),
         body: BlocConsumer<AuthBloc, AuthState>(
-          listener: (context, state) {
+          listener: (BuildContext context, AuthState state) {
             if (state.isAuthenticated && state.user != null) {
               context.go(Routes.home);
             }
@@ -34,14 +34,13 @@ class LoginPage extends StatelessWidget {
               );
             }
           },
-          builder: (context, state) {
-            return SingleChildScrollView(
+          builder: (BuildContext context, AuthState state) => SingleChildScrollView(
               padding: const EdgeInsets.all(16.0),
               child: FormBuilder(
                 key: formKey,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
+                  children: <Widget>[
                     const SizedBox(height: 32),
                     const Text(
                       'Welcome Back',
@@ -69,7 +68,7 @@ class LoginPage extends StatelessWidget {
                         prefixIcon: Icon(Icons.email),
                       ),
                       keyboardType: TextInputType.emailAddress,
-                      validator: FormBuilderValidators.compose([
+                      validator: FormBuilderValidators.compose(<String? Function(String?)>[
                         FormBuilderValidators.required(),
                         FormBuilderValidators.email(),
                       ]),
@@ -83,7 +82,7 @@ class LoginPage extends StatelessWidget {
                         prefixIcon: Icon(Icons.lock),
                       ),
                       obscureText: true,
-                      validator: FormBuilderValidators.compose([
+                      validator: FormBuilderValidators.compose(<String? Function(String?)>[
                         FormBuilderValidators.required(),
                         FormBuilderValidators.minLength(6),
                       ]),
@@ -94,8 +93,8 @@ class LoginPage extends StatelessWidget {
                           ? null
                           : () {
                               if (formKey.currentState?.saveAndValidate() ?? false) {
-                                final email = formKey.currentState?.value['email'] as String;
-                                final password = formKey.currentState?.value['password'] as String;
+                                final String email = formKey.currentState?.value['email'] as String;
+                                final String password = formKey.currentState?.value['password'] as String;
                                 context.read<AuthBloc>().add(
                                       AuthEvent.login(email, password),
                                     );
@@ -122,8 +121,7 @@ class LoginPage extends StatelessWidget {
                   ],
                 ),
               ),
-            );
-          },
+            ),
         ),
       ),
     );

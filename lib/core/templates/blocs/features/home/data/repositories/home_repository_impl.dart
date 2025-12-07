@@ -17,7 +17,7 @@ class HomeRepositoryImpl implements HomeRepository {
     final Either<Failure, List<HomeModel>> result = await homeRemoteDataSource.fetchData();
     return result.fold(
       (Failure failure) => Left<Failure, List<HomeEntity>>(failure),
-      (List<HomeModel> models) => Right(models.map((model) => HomeEntity.fromModel(model)).toList()),
+      (List<HomeModel> models) => Right<Failure, List<HomeEntity>>(models.map((HomeModel model) => HomeEntity.fromModel(model)).toList()),
     );
   }
 }

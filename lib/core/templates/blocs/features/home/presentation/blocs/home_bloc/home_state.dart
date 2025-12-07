@@ -4,7 +4,7 @@ part of 'home_bloc.dart';
 abstract class HomeState with _$HomeState {
   const factory HomeState({
     @Default(false) bool isLoading,
-    @Default([]) List<HomeEntity> items,
+    @Default(<HomeEntity>[]) List<HomeEntity> items,
     Failure? failure,
   }) = _HomeState;
 }

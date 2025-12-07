@@ -46,8 +46,9 @@ class FileSystemDataSourceImpl implements FileSystemDataSource {
           'replay_bloc: ^0.3.0',
           'bloc_concurrency: ^0.3.0',
           'dartz: ^0.10.1',
-          'path_provider: ^2.1.5',
-          'equatable: ^2.0.7',
+        'path_provider: ^2.1.5',
+        'path: ^1.9.0',
+        'equatable: ^2.0.7',
           'get_it: ^8.2.0',
           'dio: ^5.9.0',
           'flutter_secure_storage: ^9.2.2',
@@ -1724,6 +1725,7 @@ analyzer:
     unnecessary_null_comparison: ignore
     invalid_annotation_target: ignore
     constant_identifier_names: ignore
+    depend_on_referenced_packages: ignore
   exclude:
     - bricks/**
     - '**/*.arb'

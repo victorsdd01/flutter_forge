@@ -6,7 +6,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:hydrated_bloc/hydrated_bloc.dart';
 
 import 'application/application.dart';
-import 'application/injector.dart';
 import 'features/home/presentation/blocs/home_bloc/home_bloc.dart';
 import 'features/auth/presentation/blocs/auth_bloc/auth_bloc.dart';
 import 'core/services/talker_service.dart';
@@ -38,9 +37,7 @@ Future<void> runMainApp() async {
     FlutterError.presentError(details);
   };
 
-  PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
-    return true;
-  };
+  PlatformDispatcher.instance.onError = (Object error, StackTrace stack) => true;
 
   runApp(
     MultiBlocProvider(

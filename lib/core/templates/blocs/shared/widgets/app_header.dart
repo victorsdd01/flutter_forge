@@ -5,10 +5,8 @@ class AppHeader extends StatelessWidget {
   const AppHeader({super.key, required this.title});
 
   @override
-  Widget build(BuildContext context) {
-    return AppBar(
+  Widget build(BuildContext context) => AppBar(
       title: Text(title),
     );
-  }
 }
 
