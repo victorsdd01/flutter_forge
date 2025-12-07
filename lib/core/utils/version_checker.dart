@@ -24,19 +24,26 @@ class VersionChecker {
   static String getCurrentVersion() {
     try {
       final pubspecPath = _findPubspecPath();
-      if (pubspecPath == null) {
-        return '1.0.0';
+      if (pubspecPath != null) {
+        final file = File(pubspecPath);
+        if (file.existsSync()) {
+          final content = file.readAsStringSync();
+          final versionMatch = RegExp(r'version:\s*(\d+\.\d+\.\d+)').firstMatch(content);
+          if (versionMatch != null) {
+            return versionMatch.group(1)!;
+          }
+        }
       }
       
-      final file = File(pubspecPath);
-      if (!file.existsSync()) {
-        return '1.0.0';
-      }
-      
-      final content = file.readAsStringSync();
-      final versionMatch = RegExp(r'version:\s*(\d+\.\d+\.\d+)').firstMatch(content);
-      if (versionMatch != null) {
-        return versionMatch.group(1)!;
+      // If not found locally, try to get from Git repository (for globally installed packages)
+      // This is a fallback that works when installed via `dart pub global activate --source git`
+      try {
+        final gitVersion = getLatestCLIVersionFromGitSync();
+        if (gitVersion != null) {
+          return gitVersion;
+        }
+      } catch (e) {
+        // Ignore errors
       }
     } catch (e) {
       // Fallback to default version
@@ -52,6 +59,7 @@ class VersionChecker {
       final scriptDir = path.dirname(scriptPath);
       final scriptDirNormalized = path.normalize(scriptDir);
       
+      // Try to find pubspec.yaml relative to the script location
       final possiblePaths = <String>[
         path.join(scriptDirNormalized, 'pubspec.yaml'),
         path.join(scriptDirNormalized, '..', 'pubspec.yaml'),
@@ -59,23 +67,89 @@ class VersionChecker {
         path.join(scriptDirNormalized, '..', '..', '..', 'pubspec.yaml'),
         path.join(scriptDirNormalized, '..', '..', '..', '..', 'pubspec.yaml'),
         path.join(scriptDirNormalized, '..', '..', '..', '..', '..', 'pubspec.yaml'),
+        path.join(scriptDirNormalized, '..', '..', '..', '..', '..', '..', 'pubspec.yaml'),
         path.join(Directory.current.path, 'pubspec.yaml'),
       ];
       
+      // Also try pub-cache locations for globally installed packages
+      final homeDir = Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'] ?? '';
+      if (homeDir.isNotEmpty) {
+        final pubCacheBase = path.join(homeDir, '.pub-cache');
+        
+        // Try global_packages location
+        possiblePaths.add(path.join(pubCacheBase, 'global_packages', 'flutterforge', 'pubspec.yaml'));
+        
+        // Try git cache location (for packages installed from Git)
+        try {
+          final gitCacheDir = Directory(path.join(pubCacheBase, 'git', 'cache'));
+          if (gitCacheDir.existsSync()) {
+            final entries = gitCacheDir.listSync();
+            for (final entry in entries) {
+              if (entry is Directory) {
+                final pubspecFile = File(path.join(entry.path, 'pubspec.yaml'));
+                if (pubspecFile.existsSync()) {
+                  final content = pubspecFile.readAsStringSync();
+                  // Check if this is the flutterforge package
+                  if (content.contains('name: flutterforge') || 
+                      entry.path.contains('flutter_forge') ||
+                      entry.path.contains('flutter-forge')) {
+                    possiblePaths.add(pubspecFile.path);
+                  }
+                }
+              }
+            }
+          }
+        } catch (e) {
+          // Ignore errors when searching
+        }
+      }
+      
       for (final possiblePath in possiblePaths) {
-        final normalizedPath = path.normalize(possiblePath);
-        final file = File(normalizedPath);
-        if (file.existsSync()) {
-          return normalizedPath;
+        try {
+          final normalizedPath = path.normalize(possiblePath);
+          final file = File(normalizedPath);
+          if (file.existsSync()) {
+            return normalizedPath;
+          }
+        } catch (e) {
+          // Continue searching
         }
       }
     } catch (e) {
       // Try alternative method
     }
     
-    final currentDirPubspec = File(path.join(Directory.current.path, 'pubspec.yaml'));
-    if (currentDirPubspec.existsSync()) {
-      return currentDirPubspec.path;
+    return null;
+  }
+  
+  /// Get version from Git synchronously (for fallback when pubspec.yaml not found locally)
+  static String? getLatestCLIVersionFromGitSync() {
+    try {
+      // Try curl first (works on macOS/Linux)
+      ProcessResult result = Process.runSync(
+        'curl',
+        ['-s', '--max-time', '5', 'https://raw.githubusercontent.com/victorsdd01/flutter_forge/main/pubspec.yaml'],
+        runInShell: true,
+      );
+      
+      if (result.exitCode != 0) {
+        // Try wget as fallback (works on Linux)
+        result = Process.runSync(
+          'wget',
+          ['-q', '--timeout=5', '-O', '-', 'https://raw.githubusercontent.com/victorsdd01/flutter_forge/main/pubspec.yaml'],
+          runInShell: true,
+        );
+      }
+      
+      if (result.exitCode == 0 && result.stdout.toString().isNotEmpty) {
+        final content = result.stdout.toString();
+        final versionMatch = RegExp(r'version:\s*(\d+\.\d+\.\d+)').firstMatch(content);
+        if (versionMatch != null) {
+          return versionMatch.group(1)!;
+        }
+      }
+    } catch (e) {
+      // Silently fail - network issues shouldn't break the CLI
     }
     
     return null;
@@ -142,19 +216,16 @@ class VersionChecker {
   /// Get the latest CLI version from Git (fallback if no releases)
   static Future<String?> getLatestCLIVersionFromGit() async {
     try {
+      // Get from main branch directly (more reliable than API)
       final response = await http.get(
-        Uri.parse('https://api.github.com/repos/victorsdd01/flutter_forge/contents/pubspec.yaml'),
-      );
+        Uri.parse('https://raw.githubusercontent.com/victorsdd01/flutter_forge/main/pubspec.yaml'),
+      ).timeout(const Duration(seconds: 10));
       
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final content = data['content'] as String?;
-        if (content != null) {
-          final decodedContent = utf8.decode(base64Decode(content));
-          final versionMatch = RegExp(r'version:\s*(\d+\.\d+\.\d+)').firstMatch(decodedContent);
-          if (versionMatch != null) {
-            return versionMatch.group(1)!;
-          }
+        final content = response.body;
+        final versionMatch = RegExp(r'version:\s*(\d+\.\d+\.\d+)').firstMatch(content);
+        if (versionMatch != null) {
+          return versionMatch.group(1)!;
         }
       }
     } catch (e) {

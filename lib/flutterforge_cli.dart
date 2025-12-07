@@ -218,7 +218,15 @@ class FlutterForgeCLI {
     print('${brightCyan}${bold}╚══════════════════════════════════════════════════════════════╝${reset}');
     print('');
     
-    final currentVersion = _version;
+    // Get current version (try local first, then from Git if not found)
+    String currentVersion = _version;
+    if (currentVersion == '1.0.0') {
+      // If we got the default version, try to get it from Git
+      final gitCurrentVersion = await VersionChecker.getLatestCLIVersionFromGit();
+      if (gitCurrentVersion != null) {
+        currentVersion = gitCurrentVersion;
+      }
+    }
     print('${brightGreen}${bold}📦 Current version:${reset} ${brightYellow}$currentVersion${reset}');
     
     // Check for latest version (tries releases first, then Git)
