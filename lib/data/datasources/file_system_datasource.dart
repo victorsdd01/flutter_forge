@@ -59,7 +59,7 @@ class FileSystemDataSourceImpl implements FileSystemDataSource {
           'flutter_form_builder: ^10.2.0',
           'form_builder_validators: ^11.2.0',
           'drift: ^2.18.0',
-          'sqlite3_flutter_libs: ^0.5.20',
+          'sqlite3_flutter_libs: ^0.5.0',
         ]);
         
         if (includeFreezed) {
