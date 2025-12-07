@@ -205,6 +205,14 @@ jobs:
           # Ensure we're on main
           git checkout main
           
+          # Check if branch already exists remotely
+          if git ls-remote --heads origin "$BRANCH_NAME" | grep -q "$BRANCH_NAME"; then
+            echo "⚠️ Branch $BRANCH_NAME already exists remotely. Deleting it..."
+            git push origin --delete "$BRANCH_NAME" || echo "Branch may not exist or already deleted"
+            # Wait a moment for the deletion to propagate
+            sleep 2
+          fi
+          
           # Create and checkout new branch from main
           git checkout -b "$BRANCH_NAME"
           
@@ -231,8 +239,13 @@ jobs:
           echo "Commit created:"
           git log -1 --stat
           
-          # Push branch
-          git push origin "$BRANCH_NAME"
+          # Push branch (force push if needed to overwrite any existing branch)
+          echo ""
+          echo "Pushing branch to origin..."
+          git push origin "$BRANCH_NAME" || {
+            echo "⚠️ Initial push failed, trying force push..."
+            git push origin "$BRANCH_NAME" --force
+          }
           
           # Verify branch has differences from main
           echo ""
