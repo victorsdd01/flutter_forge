@@ -4,85 +4,43 @@ on:
   pull_request:
     types: [closed]
     branches: [main]
-  push:
-    branches: [main]
-    paths-ignore:
-      - '**.md'
-      - '.github/**'
 
 permissions:
   contents: write
-  pull-requests: write
-  issues: write
 
 jobs:
   bump-version:
     if: |
-      (github.event_name == 'pull_request' && github.event.pull_request.merged == true && !contains(github.event.pull_request.title, '[skip ci]') && !contains(github.event.pull_request.title, 'chore: bump version')) ||
-      (github.event_name == 'push' && !contains(github.event.head_commit.message, '[skip ci]') && !contains(github.event.head_commit.message, 'chore: bump version'))
+      github.event.pull_request.merged == true &&
+      !contains(github.event.pull_request.title, '[skip ci]') &&
+      !contains(github.event.pull_request.title, 'chore: bump version')
     runs-on: ubuntu-latest
     steps:
-      - name: Debug workflow trigger
-        run: |
-          echo "Event: ${{ github.event_name }}"
-          echo "Action: ${{ github.event.action }}"
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "PR Title: ${{ github.event.pull_request.title }}"
-            echo "PR Merged: ${{ github.event.pull_request.merged }}"
-            echo "PR Number: ${{ github.event.pull_request.number }}"
-          fi
-          if [ "${{ github.event_name }}" = "push" ]; then
-            echo "Commit Message: ${{ github.event.head_commit.message }}"
-            echo "Commit Author: ${{ github.event.head_commit.author.name }}"
-          fi
-      
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
           fetch-depth: 0
+          persist-credentials: true
 
-      - name: Get current version
-        id: get_version
+      - name: Get current version (for release)
+        id: current_version
         run: |
           CURRENT_VERSION=$(grep "version:" pubspec.yaml | cut -d " " -f 2 | tr -d '\r')
-          echo "Current version: $CURRENT_VERSION"
-          
-          # Parse version parts (ej: "1.10.0" -> "1", "10", "0")
-          MAJOR=$(echo $CURRENT_VERSION | cut -d '.' -f 1)
-          MINOR=$(echo $CURRENT_VERSION | cut -d '.' -f 2)
-          PATCH=$(echo $CURRENT_VERSION | cut -d '.' -f 3)
-          
-          # Increment patch version (1.10.0 -> 1.10.1)
-          NEW_PATCH=$((PATCH + 1))
-          NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
-          
-          echo "New version: $NEW_VERSION"
-          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "Current version (for release): $CURRENT_VERSION"
+          echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
 
       - name: Get PR information
         id: pr_info
         run: |
-          EVENT_NAME="${{ github.event_name }}"
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          PR_BODY="${{ github.event.pull_request.body }}"
           
-          if [ "$EVENT_NAME" = "pull_request" ]; then
-            PR_TITLE="${{ github.event.pull_request.title }}"
-            PR_BODY="${{ github.event.pull_request.body }}"
-            PR_AUTHOR="${{ github.event.pull_request.user.login }}"
-          else
-            # For push events, use commit message
-            PR_TITLE="${{ github.event.head_commit.message }}"
-            PR_BODY=""
-            PR_AUTHOR="${{ github.event.head_commit.author.name }}"
-          fi
-          
-          # Sanitize variables to prevent command injection
+          # Sanitize variables
           PR_TITLE=$(echo "$PR_TITLE" | tr -d '\r')
           PR_BODY=$(echo "$PR_BODY" | tr -d '\r')
-          PR_AUTHOR=$(echo "$PR_AUTHOR" | tr -d '\r')
           
           echo "PR Title: $PR_TITLE"
-          echo "PR Author: $PR_AUTHOR"
           
           # Use delimiter to handle multiline content safely
           {
@@ -96,18 +54,82 @@ jobs:
             printf '%s\n' "$PR_BODY"
             echo "EOF"
           } >> $GITHUB_OUTPUT
+
+      - name: Extract release notes from CHANGELOG (current version)
+        id: release_notes
+        run: |
+          VERSION="${{ steps.current_version.outputs.version }}"
+          # Extract the changelog entry for current version
+          RELEASE_NOTES=$(awk "/^## \[$VERSION\]/,/^## \[/" CHANGELOG.md | sed '/^## \[/d' | sed '/^$/d' | head -n 20)
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          echo "$RELEASE_NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create Git tag (current version)
+        run: |
+          VERSION="${{ steps.current_version.outputs.version }}"
+          git tag -a "v$VERSION" -m "Release v$VERSION"
+          git push origin "v$VERSION"
+          echo "✅ Created and pushed tag v$VERSION"
+
+      - name: Create GitHub Release (current version)
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.current_version.outputs.version }}
+          name: FlutterForge CLI v${{ steps.current_version.outputs.version }}
+          body: |
+            ## 🚀 What's New in v${{ steps.current_version.outputs.version }}
+            
+            ${{ steps.release_notes.outputs.notes }}
+            
+            ---
+            
+            ### 📦 Installation
+            
+            ```bash
+            dart pub global activate --source git https://github.com/victorsdd01/flutter_forge.git
+            ```
+            
+            ### 🔄 Update
+            
+            ```bash
+            flutterforge --update
+            ```
+            
+            ### 📚 Full Changelog
+            
+            See [CHANGELOG.md](https://github.com/victorsdd01/flutter_forge/blob/main/CHANGELOG.md) for the complete list of changes.
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Calculate new version
+        id: new_version
+        run: |
+          CURRENT_VERSION="${{ steps.current_version.outputs.version }}"
           
-          echo "pr_author=$PR_AUTHOR" >> $GITHUB_OUTPUT
+          # Parse version parts (ej: "1.10.0" -> "1", "10", "0")
+          MAJOR=$(echo $CURRENT_VERSION | cut -d '.' -f 1)
+          MINOR=$(echo $CURRENT_VERSION | cut -d '.' -f 2)
+          PATCH=$(echo $CURRENT_VERSION | cut -d '.' -f 3)
+          
+          # Increment patch version (1.10.0 -> 1.10.1)
+          NEW_PATCH=$((PATCH + 1))
+          NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
+          
+          echo "New version: $NEW_VERSION"
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
 
       - name: Update pubspec.yaml
         run: |
-          sed -i "s/version:.*/version: ${{ steps.get_version.outputs.version }}/" pubspec.yaml
+          sed -i "s/version:.*/version: ${{ steps.new_version.outputs.version }}/" pubspec.yaml
           echo "Updated pubspec.yaml:"
           grep "version:" pubspec.yaml
 
       - name: Update CHANGELOG.md
         run: |
-          VERSION="${{ steps.get_version.outputs.version }}"
+          VERSION="${{ steps.new_version.outputs.version }}"
           PR_TITLE="${{ steps.pr_info.outputs.pr_title }}"
           PR_BODY="${{ steps.pr_info.outputs.pr_body }}"
           DATE=$(date +%Y-%m-%d)
@@ -133,7 +155,6 @@ jobs:
           # Create Python script file
           cat > /tmp/update_changelog.py << 'PYEOF'
           import re
-          import sys
           import os
           
           version = os.environ.get('VERSION', '')
@@ -178,7 +199,7 @@ jobs:
           PYEOF
           
           # Execute Python script with environment variables
-          export VERSION="${{ steps.get_version.outputs.version }}"
+          export VERSION="${{ steps.new_version.outputs.version }}"
           export DATE="$DATE"
           export CHANGELOG_CONTENT="$CHANGELOG_CONTENT"
           python3 /tmp/update_changelog.py
@@ -192,250 +213,17 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
 
-      - name: Ensure we're on main and up to date
+      - name: Commit and push version bump to main
         run: |
           git checkout main
           git pull origin main
-
-      - name: Create version bump branch and commit
-        id: version_bump
-        run: |
-          VERSION="${{ steps.get_version.outputs.version }}"
-          BRANCH_NAME="chore/bump-version-$VERSION"
           
-          # Ensure we're on main
-          git checkout main
-          
-          # Check if branch already exists remotely
-          if git ls-remote --heads origin "$BRANCH_NAME" | grep -q "$BRANCH_NAME"; then
-            echo "⚠️ Branch $BRANCH_NAME already exists remotely. Deleting it..."
-            git push origin --delete "$BRANCH_NAME" || echo "Branch may not exist or already deleted"
-            # Wait a moment for the deletion to propagate
-            sleep 2
-          fi
-          
-          # Create and checkout new branch from main
-          git checkout -b "$BRANCH_NAME"
-          
-          # Verify files exist and show current state
-          echo "Current pubspec.yaml version:"
-          grep "version:" pubspec.yaml || echo "pubspec.yaml not found"
-          echo ""
-          echo "Current CHANGELOG.md (first 20 lines):"
-          head -n 20 CHANGELOG.md || echo "CHANGELOG.md not found"
-          
-          # Stage changes
           git add pubspec.yaml CHANGELOG.md
+          git commit -m "chore: bump version to ${{ steps.new_version.outputs.version }} [skip ci]"
           
-          # Show what will be committed
-          echo ""
-          echo "Files staged for commit:"
-          git status --short
+          # Push to main
+          git push origin main
           
-          # Commit changes
-          git commit -m "chore: bump version to $VERSION [skip ci]"
-          
-          # Show commit details
-          echo ""
-          echo "Commit created:"
-          git log -1 --stat
-          
-          # Push branch (force push if needed to overwrite any existing branch)
-          echo ""
-          echo "Pushing branch to origin..."
-          git push origin "$BRANCH_NAME" || {
-            echo "⚠️ Initial push failed, trying force push..."
-            git push origin "$BRANCH_NAME" --force
-          }
-          
-          # Verify branch has differences from main
-          echo ""
-          echo "Checking differences with main:"
-          git diff main..HEAD --stat || echo "No differences found"
-          
-          # Count commits ahead of main
-          COMMITS_AHEAD=$(git rev-list --count main..HEAD)
-          echo "Commits ahead of main: $COMMITS_AHEAD"
-          
-          if [ "$COMMITS_AHEAD" -eq 0 ]; then
-            echo "⚠️ Warning: Branch has no commits ahead of main"
-          fi
-          
-          echo "branch=$BRANCH_NAME" >> $GITHUB_OUTPUT
-
-      - name: Create Pull Request
-        id: create_pr
-        run: |
-          VERSION="${{ steps.get_version.outputs.version }}"
-          BRANCH_NAME="${{ steps.version_bump.outputs.branch }}"
-          
-          # Determine PR trigger source
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            TRIGGER_SOURCE="merging PR #${{ github.event.pull_request.number }}"
-          else
-            TRIGGER_SOURCE="a push to main"
-          fi
-          
-          # Create PR body file to avoid shell escaping issues
-          cat > /tmp/pr_body.txt << 'BODYEOF'
-          This PR was automatically created to bump the version after TRIGGER_PLACEHOLDER.
-          
-          **Changes:**
-          - Updated `pubspec.yaml` version to VERSION_PLACEHOLDER
-          - Updated `CHANGELOG.md` with new release entry
-          
-          This PR will be auto-merged if branch protection allows.
-          BODYEOF
-          
-          # Replace placeholders
-          sed -i "s/TRIGGER_PLACEHOLDER/$TRIGGER_SOURCE/g" /tmp/pr_body.txt
-          sed -i "s/VERSION_PLACEHOLDER/$VERSION/g" /tmp/pr_body.txt
-          
-          # Check which labels exist in the repository
-          AVAILABLE_LABELS=""
-          if gh label list --json name --jq '.[].name' 2>/dev/null | grep -q "^automated$"; then
-            AVAILABLE_LABELS="automated"
-          fi
-          if gh label list --json name --jq '.[].name' 2>/dev/null | grep -q "^chore$"; then
-            if [ -n "$AVAILABLE_LABELS" ]; then
-              AVAILABLE_LABELS="$AVAILABLE_LABELS,chore"
-            else
-              AVAILABLE_LABELS="chore"
-            fi
-          fi
-          
-          # Create PR with proper escaping
-          if [ -n "$AVAILABLE_LABELS" ]; then
-            echo "Using labels: $AVAILABLE_LABELS"
-            PR_OUTPUT=$(gh pr create \
-              --title "chore: bump version to $VERSION [skip ci]" \
-              --body-file /tmp/pr_body.txt \
-              --base main \
-              --head "$BRANCH_NAME" \
-              --label "$AVAILABLE_LABELS" 2>&1) || PR_EXIT_CODE=$?
-          else
-            echo "⚠️ Labels 'automated' and 'chore' not found. Creating PR without labels."
-            PR_OUTPUT=$(gh pr create \
-              --title "chore: bump version to $VERSION [skip ci]" \
-              --body-file /tmp/pr_body.txt \
-              --base main \
-              --head "$BRANCH_NAME" 2>&1) || PR_EXIT_CODE=$?
-          fi
-          
-          if [ -z "${PR_EXIT_CODE:-}" ] && [ -n "$PR_OUTPUT" ]; then
-            # Extract PR number from output (format: "https://github.com/owner/repo/pull/123")
-            PR_NUMBER=$(echo "$PR_OUTPUT" | grep -oE 'pull/[0-9]+' | head -1 | cut -d'/' -f2)
-            PR_URL=$(echo "$PR_OUTPUT" | grep -oE 'https://[^\s]+' | head -1)
-            
-            if [ -n "$PR_NUMBER" ]; then
-              echo "✅ Created PR #$PR_NUMBER: $PR_URL"
-              echo "pull-request-number=$PR_NUMBER" >> $GITHUB_OUTPUT
-            else
-              echo "⚠️ PR created but could not extract PR number from output:"
-              echo "$PR_OUTPUT"
-              echo "pull-request-number=" >> $GITHUB_OUTPUT
-            fi
-          else
-            echo "⚠️ Failed to create PR. Output:"
-            echo "$PR_OUTPUT"
-            echo "pull-request-number=" >> $GITHUB_OUTPUT
-          fi
+          echo "✅ Version bumped to ${{ steps.new_version.outputs.version }} and pushed to main"
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Auto-merge PR (if possible)
-        if: steps.create_pr.outputs.pull-request-number != ''
-        run: |
-          PR_NUMBER="${{ steps.create_pr.outputs.pull-request-number }}"
-          echo "Attempting to auto-merge PR #$PR_NUMBER..."
-          
-          # Try to merge the PR
-          if gh pr merge "$PR_NUMBER" --auto --squash; then
-            echo "✅ PR #$PR_NUMBER queued for auto-merge"
-            
-            # Wait and check if PR was merged (poll up to 30 seconds)
-            MAX_WAIT=30
-            WAITED=0
-            while [ $WAITED -lt $MAX_WAIT ]; do
-              sleep 2
-              WAITED=$((WAITED + 2))
-              PR_STATE=$(gh pr view "$PR_NUMBER" --json state --jq '.state')
-              if [ "$PR_STATE" = "MERGED" ]; then
-                echo "✅ PR #$PR_NUMBER successfully merged!"
-                echo "merged=true" >> $GITHUB_OUTPUT
-                
-                # Fetch latest changes
-                git fetch origin main
-                git checkout main
-                git pull origin main
-                break
-              fi
-              echo "Waiting for PR to merge... ($WAITED/$MAX_WAIT seconds)"
-            done
-            
-            if [ "$PR_STATE" != "MERGED" ]; then
-              echo "⚠️ PR #$PR_NUMBER not merged yet (may require manual approval or more time)"
-              echo "merged=false" >> $GITHUB_OUTPUT
-            fi
-          else
-            echo "⚠️ Could not auto-merge PR #$PR_NUMBER (may require manual approval)"
-            echo "merged=false" >> $GITHUB_OUTPUT
-          fi
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        id: auto_merge
-
-      - name: Extract release notes from CHANGELOG
-        if: steps.auto_merge.outputs.merged == 'true'
-        id: release_notes
-        run: |
-          VERSION="${{ steps.get_version.outputs.version }}"
-          # Extract the changelog entry for this version
-          RELEASE_NOTES=$(awk "/^## \[$VERSION\]/,/^## \[/" CHANGELOG.md | sed '/^## \[/d' | sed '/^$/d' | head -n 20)
-          # Escape for JSON
-          RELEASE_NOTES_JSON=$(echo "$RELEASE_NOTES" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
-          echo "notes<<EOF" >> $GITHUB_OUTPUT
-          echo "$RELEASE_NOTES" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
-      - name: Create Git tag
-        if: steps.auto_merge.outputs.merged == 'true'
-        run: |
-          VERSION="${{ steps.get_version.outputs.version }}"
-          git tag -a "v$VERSION" -m "Release v$VERSION"
-          git push origin "v$VERSION"
-          echo "✅ Created and pushed tag v$VERSION"
-
-      - name: Create GitHub Release
-        if: steps.auto_merge.outputs.merged == 'true'
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: v${{ steps.get_version.outputs.version }}
-          name: FlutterForge CLI v${{ steps.get_version.outputs.version }}
-          body: |
-            ## 🚀 What's New in v${{ steps.get_version.outputs.version }}
-            
-            ${{ steps.release_notes.outputs.notes }}
-            
-            ---
-            
-            ### 📦 Installation
-            
-            ```bash
-            dart pub global activate --source git https://github.com/victorsdd01/flutter_forge.git
-            ```
-            
-            ### 🔄 Update
-            
-            ```bash
-            flutterforge --update
-            ```
-            
-            ### 📚 Full Changelog
-            
-            See [CHANGELOG.md](https://github.com/victorsdd01/flutter_forge/blob/main/CHANGELOG.md) for the complete list of changes.
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
