@@ -53,26 +53,13 @@ class VersionChecker {
   }
   
   /// Find pubspec.yaml path (works when installed globally or locally)
+  /// Prioritizes pub-cache (global installation) over local paths
   static String? _findPubspecPath() {
     try {
-      final scriptPath = Platform.script.toFilePath();
-      final scriptDir = path.dirname(scriptPath);
-      final scriptDirNormalized = path.normalize(scriptDir);
-      
-      // Try to find pubspec.yaml relative to the script location
-      final possiblePaths = <String>[
-        path.join(scriptDirNormalized, 'pubspec.yaml'),
-        path.join(scriptDirNormalized, '..', 'pubspec.yaml'),
-        path.join(scriptDirNormalized, '..', '..', 'pubspec.yaml'),
-        path.join(scriptDirNormalized, '..', '..', '..', 'pubspec.yaml'),
-        path.join(scriptDirNormalized, '..', '..', '..', '..', 'pubspec.yaml'),
-        path.join(scriptDirNormalized, '..', '..', '..', '..', '..', 'pubspec.yaml'),
-        path.join(scriptDirNormalized, '..', '..', '..', '..', '..', '..', 'pubspec.yaml'),
-        path.join(Directory.current.path, 'pubspec.yaml'),
-      ];
-      
-      // Also try pub-cache locations for globally installed packages
       final homeDir = Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'] ?? '';
+      final possiblePaths = <String>[];
+      
+      // FIRST: Try pub-cache locations for globally installed packages (priority)
       if (homeDir.isNotEmpty) {
         final pubCacheBase = path.join(homeDir, '.pub-cache');
         
@@ -104,6 +91,27 @@ class VersionChecker {
         }
       }
       
+      // SECOND: Try to find pubspec.yaml relative to the script location (local development)
+      try {
+        final scriptPath = Platform.script.toFilePath();
+        final scriptDir = path.dirname(scriptPath);
+        final scriptDirNormalized = path.normalize(scriptDir);
+        
+        possiblePaths.addAll([
+          path.join(scriptDirNormalized, 'pubspec.yaml'),
+          path.join(scriptDirNormalized, '..', 'pubspec.yaml'),
+          path.join(scriptDirNormalized, '..', '..', 'pubspec.yaml'),
+          path.join(scriptDirNormalized, '..', '..', '..', 'pubspec.yaml'),
+          path.join(scriptDirNormalized, '..', '..', '..', '..', 'pubspec.yaml'),
+          path.join(scriptDirNormalized, '..', '..', '..', '..', '..', 'pubspec.yaml'),
+          path.join(scriptDirNormalized, '..', '..', '..', '..', '..', '..', 'pubspec.yaml'),
+          path.join(Directory.current.path, 'pubspec.yaml'),
+        ]);
+      } catch (e) {
+        // Ignore errors
+      }
+      
+      // Check paths in order (pub-cache first, then local)
       for (final possiblePath in possiblePaths) {
         try {
           final normalizedPath = path.normalize(possiblePath);
