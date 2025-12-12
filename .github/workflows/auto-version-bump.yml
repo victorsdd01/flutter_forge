@@ -251,7 +251,7 @@ jobs:
           DATE=$(date +%Y-%m-%d)
           
           # Clean PR title (remove version tags like [MINOR], [MAJOR], etc.)
-          CLEAN_TITLE=$(echo "$PR_TITLE" | sed 's/\[MINOR\]//g' | sed 's/\[MAJOR\]//g' | sed 's/\[PATCH\]//g' | sed 's/\[SKIP\]//g' | xargs)
+          CLEAN_TITLE=$(echo "$PR_TITLE" | sed 's/\[MINOR\]//g' | sed 's/\[MAJOR\]//g' | sed 's/\[PATCH\]//g' | sed 's/\[SKIP\]//g' | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//')
           
           # Extract changelog content from PR body if it exists
           CHANGELOG_CONTENT=""
