@@ -31,45 +31,27 @@ jobs:
       - name: Check if version bump already done
         id: check_version_bump
         run: |
-          # Fetch main branch to compare versions
+          # Fetch main branch to compare commits
           git fetch origin main --quiet || true
           
-          # Get version from main branch (the version that should be released)
-          MAIN_VERSION=$(git show origin/main:pubspec.yaml 2>/dev/null | grep "^version:" | head -1 | sed 's/version:[[:space:]]*//' | tr -d '\r' || echo "")
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
           
-          # Get version from current PR branch
-          PR_VERSION=$(grep "^version:" pubspec.yaml | head -1 | sed 's/version:[[:space:]]*//' | tr -d '\r' || echo "")
+          echo "Base SHA (main): $BASE_SHA"
+          echo "Head SHA (PR): $HEAD_SHA"
           
-          echo "Main branch version: $MAIN_VERSION"
-          echo "PR branch version: $PR_VERSION"
+          # Check if there's already a "chore: bump version" commit in this PR
+          BUMP_COMMIT_EXISTS=$(git log --oneline "$BASE_SHA..$HEAD_SHA" | grep -i "chore: bump version" || echo "")
           
-          # Check if PR version is newer than main version
-          # If versions are the same, we need to bump
-          # If PR version is newer, check if it's exactly one patch version ahead
-          if [ -z "$MAIN_VERSION" ] || [ -z "$PR_VERSION" ]; then
-            echo "⚠️ Could not determine versions, proceeding with bump"
-            echo "already_done=false" >> $GITHUB_OUTPUT
-          elif [ "$MAIN_VERSION" = "$PR_VERSION" ]; then
-            echo "Versions are the same, version bump needed"
-            echo "already_done=false" >> $GITHUB_OUTPUT
+          if [ -n "$BUMP_COMMIT_EXISTS" ]; then
+            echo "✅ Version bump commit already exists in this PR, skipping..."
+            echo "Bump commit found: $BUMP_COMMIT_EXISTS"
+            echo "already_done=true" >> $GITHUB_OUTPUT
           else
-            # Parse versions to compare
-            MAIN_MAJOR=$(echo "$MAIN_VERSION" | cut -d '.' -f 1)
-            MAIN_MINOR=$(echo "$MAIN_VERSION" | cut -d '.' -f 2)
-            MAIN_PATCH=$(echo "$MAIN_VERSION" | cut -d '.' -f 3)
-            
-            PR_MAJOR=$(echo "$PR_VERSION" | cut -d '.' -f 1)
-            PR_MINOR=$(echo "$PR_VERSION" | cut -d '.' -f 2)
-            PR_PATCH=$(echo "$PR_VERSION" | cut -d '.' -f 3)
-            
-            # Check if PR version is exactly one patch version ahead
-            if [ "$MAIN_MAJOR" = "$PR_MAJOR" ] && [ "$MAIN_MINOR" = "$PR_MINOR" ] && [ "$((PR_PATCH - MAIN_PATCH))" = "1" ]; then
-              echo "✅ Version already bumped in this PR (from $MAIN_VERSION to $PR_VERSION), skipping..."
-              echo "already_done=true" >> $GITHUB_OUTPUT
-            else
-              echo "Version difference detected but not a simple patch bump, proceeding with bump"
-              echo "already_done=false" >> $GITHUB_OUTPUT
-            fi
+            echo "No version bump commit found in this PR, proceeding with bump"
+            echo "Commits in PR:"
+            git log --oneline "$BASE_SHA..$HEAD_SHA" | head -5
+            echo "already_done=false" >> $GITHUB_OUTPUT
           fi
           
           # Always report success to GitHub (so the check passes even if already done)
