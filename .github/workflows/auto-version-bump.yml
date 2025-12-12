@@ -39,13 +39,13 @@ jobs:
           echo "Head SHA (PR): $HEAD_SHA"
           echo "Event type: ${{ github.event.action }}"
           
-          # Check if the HEAD commit itself is a "chore: bump version [skip ci]" commit
+          # Check if the HEAD commit itself is a "chore: bump version" commit
           # This means the workflow already ran and created the bump commit
           HEAD_COMMIT_MSG=$(git log -1 --format="%s" "$HEAD_SHA" || echo "")
           echo "HEAD commit message: $HEAD_COMMIT_MSG"
           
-          if echo "$HEAD_COMMIT_MSG" | grep -qi "chore: bump version.*\[skip ci\]"; then
-            echo "✅ HEAD commit is a version bump commit with [skip ci], skipping..."
+          if echo "$HEAD_COMMIT_MSG" | grep -qi "chore: bump version"; then
+            echo "✅ HEAD commit is a version bump commit, skipping..."
             echo "already_done=true" >> $GITHUB_OUTPUT
           else
             echo "HEAD commit is not a version bump commit, proceeding with bump"
@@ -354,7 +354,7 @@ jobs:
           git add pubspec.yaml CHANGELOG.md
           
           # Commit the version bump
-          git commit -m "chore: bump version to ${{ steps.new_version.outputs.version }} [skip ci]"
+          git commit -m "chore: bump version to ${{ steps.new_version.outputs.version }}"
           
           # Push to PR branch
           git push origin "$BRANCH_NAME" --force-with-lease || {
