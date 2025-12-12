@@ -309,13 +309,16 @@ class FlutterForgeCLI {
     print('${brightCyan}${bold}║${reset}${dim}           The Ultimate Flutter Project Generator           ${reset}${brightCyan}${bold}║${reset}');
     print('${brightCyan}${bold}╚══════════════════════════════════════════════════════════════╝${reset}');
     print('');
-    print('${brightGreen}${bold}📦 Version:${reset} ${brightYellow}$_version${reset}');
+    // Get current version dynamically
+    final currentVersion = VersionChecker.getCurrentVersion();
+    print('${brightGreen}${bold}📦 Version:${reset} ${brightYellow}$currentVersion${reset}');
     
     // Check for updates
     try {
       final latestVersion = await VersionChecker.getLatestCLIVersionAny();
       if (latestVersion != null) {
-        final isUpdateAvailable = VersionChecker.compareVersions(_version, latestVersion) < 0;
+        final comparison = VersionChecker.compareVersions(currentVersion, latestVersion);
+        final isUpdateAvailable = comparison < 0;
         if (isUpdateAvailable) {
           print('${brightYellow}${bold}🔄 Latest version:${reset} ${brightYellow}$latestVersion${reset} ${brightYellow}${bold}(Update available!)${reset}');
           print('');
@@ -323,6 +326,9 @@ class FlutterForgeCLI {
         } else {
           print('${brightGreen}${bold}✅ You have the latest version${reset}');
         }
+      } else {
+        // If we couldn't get latest version, don't show the "latest" message
+        print('${dim}⚠️  Could not check for updates${reset}');
       }
     } catch (e) {
       // Silently fail - don't interrupt the version display
