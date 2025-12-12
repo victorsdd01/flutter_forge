@@ -347,55 +347,37 @@ jobs:
         run: |
           BRANCH_NAME="${{ github.event.pull_request.head.ref }}"
           
-          # Check if we're in detached HEAD state (which happens when checking out by SHA)
-          CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-          echo "Current branch/HEAD: $CURRENT_BRANCH"
-          echo "Target branch: $BRANCH_NAME"
-          
-          # If we're in detached HEAD, we need to stash changes, checkout branch, then apply stash
-          if [ "$CURRENT_BRANCH" = "HEAD" ]; then
-            echo "⚠️ In detached HEAD state, stashing changes and checking out branch: $BRANCH_NAME"
-            # Stash any uncommitted changes (our version updates)
-            git stash push -m "version-bump-changes" pubspec.yaml CHANGELOG.md || true
-            # Fetch and checkout the branch
-            git fetch origin "$BRANCH_NAME" --quiet || true
-            git checkout "$BRANCH_NAME" || git checkout -b "$BRANCH_NAME" "origin/$BRANCH_NAME"
-            # Apply the stashed changes
-            git stash pop || true
-          fi
-          
-          # Fetch latest changes from remote to avoid conflicts
-          git fetch origin "$BRANCH_NAME" --quiet || true
-          
-          # Try to merge/rebase any remote changes if they exist
-          if git rev-parse --verify "origin/$BRANCH_NAME" >/dev/null 2>&1; then
-            # Check if we're behind remote
-            LOCAL=$(git rev-parse HEAD)
-            REMOTE=$(git rev-parse "origin/$BRANCH_NAME" 2>/dev/null || echo "$LOCAL")
-            if [ "$LOCAL" != "$REMOTE" ]; then
-              echo "⚠️ Branch has remote changes, pulling with merge strategy..."
-              git pull origin "$BRANCH_NAME" --no-rebase --no-edit || {
-                echo "⚠️ Pull failed, but continuing with local changes..."
-              }
-            fi
-          fi
-          
           # Check if version files have changed
           if git diff --quiet pubspec.yaml CHANGELOG.md; then
             echo "⚠️ No changes to version files, skipping commit"
             exit 0
           fi
           
-          # Stage only the version files (preserve other changes)
+          # Save the modified files to temporary location
+          cp pubspec.yaml /tmp/pubspec.yaml.bak
+          cp CHANGELOG.md /tmp/CHANGELOG.md.bak
+          
+          # Fetch and checkout the branch (this will discard our changes, but we saved them)
+          git fetch origin "$BRANCH_NAME" --quiet || true
+          git checkout -f "$BRANCH_NAME" || git checkout -b "$BRANCH_NAME" "origin/$BRANCH_NAME"
+          
+          # Restore our modified files
+          cp /tmp/pubspec.yaml.bak pubspec.yaml
+          cp /tmp/CHANGELOG.md.bak CHANGELOG.md
+          
+          # Pull latest changes if any
+          git pull origin "$BRANCH_NAME" --no-rebase --no-edit || true
+          
+          # Stage only the version files
           git add pubspec.yaml CHANGELOG.md
           
           # Commit the version bump
           git commit -m "chore: bump version to ${{ steps.new_version.outputs.version }} [skip ci]"
           
-          # Push to PR branch (force-with-lease to prevent overwriting others' work)
-          git push origin HEAD:"$BRANCH_NAME" --force-with-lease || {
+          # Push to PR branch
+          git push origin "$BRANCH_NAME" --force-with-lease || {
             echo "⚠️ Force-with-lease failed, trying regular push..."
-            git push origin HEAD:"$BRANCH_NAME"
+            git push origin "$BRANCH_NAME"
           }
           
           echo "✅ Version bumped to ${{ steps.new_version.outputs.version }} and pushed to PR branch"
