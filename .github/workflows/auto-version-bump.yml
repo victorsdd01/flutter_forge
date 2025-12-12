@@ -345,9 +345,13 @@ jobs:
       - name: Commit and push version bump to PR branch
         if: steps.check_version_bump.outputs.already_done == 'false'
         run: |
-          # Ensure we're on the PR branch and it's up to date
+          # We're already on the PR branch from the initial checkout
           BRANCH_NAME="${{ github.event.pull_request.head.ref }}"
-          git checkout "$BRANCH_NAME"
+          
+          # Verify we're on the correct branch
+          CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+          echo "Current branch: $CURRENT_BRANCH"
+          echo "Target branch: $BRANCH_NAME"
           
           # Fetch latest changes from remote to avoid conflicts
           git fetch origin "$BRANCH_NAME" --quiet || true
