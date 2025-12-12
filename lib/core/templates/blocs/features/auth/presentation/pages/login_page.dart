@@ -25,7 +25,7 @@ class LoginPage extends StatelessWidget {
             if (state.isAuthenticated && state.user != null) {
               context.go(Routes.home);
             }
-            if (state.failure != null) {
+            if (state.errorStatus.login && state.failure != null) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(state.failure!.message),
@@ -89,7 +89,7 @@ class LoginPage extends StatelessWidget {
                     ),
                     const SizedBox(height: 24),
                     ElevatedButton(
-                      onPressed: state.isLoading
+                      onPressed: state.status.isLogin
                           ? null
                           : () {
                               if (formKey.currentState?.saveAndValidate() ?? false) {
@@ -103,7 +103,7 @@ class LoginPage extends StatelessWidget {
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
-                      child: state.isLoading
+                      child: state.status.isLogin
                           ? const SizedBox(
                               height: 20,
                               width: 20,

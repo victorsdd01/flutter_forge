@@ -19,14 +19,28 @@ class HomeBloc extends HydratedBloc<HomeEvent, HomeState> {
     on<HomeEvent>((HomeEvent event, Emitter<HomeState> emit) async {
       event.map(
         initialized: (_Initialized e) async {
-          emit(state.copyWith(isLoading: true, failure: null));
+          emit(state.copyWith(
+            status: state.status.copyWith(isGetItems: true),
+            successStatus: state.successStatus.copyWith(getItems: false),
+            errorStatus: state.errorStatus.copyWith(getItems: false),
+            failure: null,
+          ));
           final Either<Failure, List<HomeEntity>> result = await _homeUseCases.fetchData();
           result.fold(
             (Failure failure) => emit(
-              state.copyWith(failure: failure, isLoading: false),
+              state.copyWith(
+                status: state.status.copyWith(isGetItems: false),
+                errorStatus: state.errorStatus.copyWith(getItems: true),
+                failure: failure,
+              ),
             ),
             (List<HomeEntity> entities) => emit(
-              state.copyWith(items: entities, isLoading: false, failure: null),
+              state.copyWith(
+                items: entities,
+                status: state.status.copyWith(isGetItems: false),
+                successStatus: state.successStatus.copyWith(getItems: true),
+                failure: null,
+              ),
             ),
           );
         },
