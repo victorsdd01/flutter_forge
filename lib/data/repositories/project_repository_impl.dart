@@ -69,6 +69,9 @@ class ProjectRepositoryImpl implements ProjectRepository {
     );
 
     await _flutterCommandDataSource.runBuildRunner(config.projectName);
+
+    // Setup CocoaPods for iOS/macOS platforms
+    await _flutterCommandDataSource.setupCocoaPods(config.projectName, config.platforms);
   }
 
   @override

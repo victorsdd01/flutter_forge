@@ -19,6 +19,8 @@ abstract class FlutterCommandDataSource {
   Future<void> cleanBuildCache(String projectName);
   
   Future<void> runBuildRunner(String projectName);
+  
+  Future<void> setupCocoaPods(String projectName, List<PlatformType> platforms);
 }
 
 /// Implementation of FlutterCommandDataSource
@@ -194,6 +196,136 @@ class FlutterCommandDataSourceImpl implements FlutterCommandDataSource {
     } catch (e) {
       print('\n⚠️  Warning: Failed to run build_runner: $e');
       print('   You may need to run "dart run build_runner build -d" manually.\n');
+    }
+  }
+
+  @override
+  Future<void> setupCocoaPods(String projectName, List<PlatformType> platforms) async {
+    // Check if iOS or macOS directories exist (Flutter creates them based on platform selection)
+    final bool hasIOS = platforms.contains(PlatformType.mobile) && 
+                        Directory('$projectName/ios').existsSync();
+    final bool hasMacOS = platforms.contains(PlatformType.desktop) && 
+                          Directory('$projectName/macos').existsSync();
+    
+    if (!hasIOS && !hasMacOS) {
+      return; // Skip if no iOS or macOS directories
+    }
+
+    const String reset = '\x1B[0m';
+    const String bold = '\x1B[1m';
+    const String brightCyan = '\x1B[96m';
+    const String dim = '\x1B[2m';
+    
+    try {
+      // Check if pod command exists
+      final podCheck = await Process.run('which', ['pod']);
+      if (podCheck.exitCode != 0) {
+        print('\n⚠️  Warning: CocoaPods is not installed.');
+        print('   iOS/macOS projects may not compile until you run:');
+        print('   cd $projectName/ios && rm -rf Pods Podfile.lock && pod repo update && pod install');
+        if (hasMacOS) {
+          print('   cd $projectName/macos && rm -rf Pods Podfile.lock && pod repo update && pod install');
+        }
+        print('');
+        return;
+      }
+
+      print('');
+      print('$brightCyan$bold📦 Setting up CocoaPods for iOS/macOS...$reset');
+      print('$dim   This may take a few moments$reset');
+      print('');
+
+      // Setup iOS CocoaPods
+      if (hasIOS) {
+        final iosDir = Directory('$projectName/ios');
+        if (iosDir.existsSync()) {
+          // Remove existing Pods and Podfile.lock
+          final podsDir = Directory('$projectName/ios/Pods');
+          final podfileLock = File('$projectName/ios/Podfile.lock');
+          
+          if (podsDir.existsSync()) {
+            await podsDir.delete(recursive: true);
+          }
+          if (podfileLock.existsSync()) {
+            await podfileLock.delete();
+          }
+
+          // Run pod repo update
+          print('$dim   Updating CocoaPods repository...$reset');
+          await Process.run(
+            'pod',
+            ['repo', 'update'],
+            workingDirectory: '$projectName/ios',
+          );
+
+          // Run pod install
+          print('$dim   Installing CocoaPods dependencies...$reset');
+          final podInstallResult = await Process.run(
+            'pod',
+            ['install', '--repo-update'],
+            workingDirectory: '$projectName/ios',
+          );
+
+          if (podInstallResult.exitCode == 0) {
+            print('$brightCyan   ✅ iOS CocoaPods setup completed$reset');
+          } else {
+            print('   ⚠️  Warning: iOS pod install completed with errors.');
+            print('   You may need to run "cd $projectName/ios && pod install" manually.');
+          }
+        }
+      }
+
+      // Setup macOS CocoaPods
+      if (hasMacOS) {
+        final macosDir = Directory('$projectName/macos');
+        if (macosDir.existsSync()) {
+          // Remove existing Pods and Podfile.lock
+          final podsDir = Directory('$projectName/macos/Pods');
+          final podfileLock = File('$projectName/macos/Podfile.lock');
+          
+          if (podsDir.existsSync()) {
+            await podsDir.delete(recursive: true);
+          }
+          if (podfileLock.existsSync()) {
+            await podfileLock.delete();
+          }
+
+          // Run pod repo update
+          print('$dim   Updating CocoaPods repository for macOS...$reset');
+          await Process.run(
+            'pod',
+            ['repo', 'update'],
+            workingDirectory: '$projectName/macos',
+          );
+
+          // Run pod install
+          print('$dim   Installing CocoaPods dependencies for macOS...$reset');
+          final podInstallResult = await Process.run(
+            'pod',
+            ['install', '--repo-update'],
+            workingDirectory: '$projectName/macos',
+          );
+
+          if (podInstallResult.exitCode == 0) {
+            print('$brightCyan   ✅ macOS CocoaPods setup completed$reset');
+          } else {
+            print('   ⚠️  Warning: macOS pod install completed with errors.');
+            print('   You may need to run "cd $projectName/macos && pod install" manually.');
+          }
+        }
+      }
+
+      print('');
+    } catch (e) {
+      print('\n⚠️  Warning: Failed to setup CocoaPods: $e');
+      print('   You may need to run the following commands manually:');
+      if (hasIOS) {
+        print('   cd $projectName/ios && rm -rf Pods Podfile.lock && pod repo update && pod install');
+      }
+      if (hasMacOS) {
+        print('   cd $projectName/macos && rm -rf Pods Podfile.lock && pod repo update && pod install');
+      }
+      print('');
     }
   }
 }
