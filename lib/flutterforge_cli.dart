@@ -50,9 +50,27 @@ class FlutterForgeCLI {
     _cliController = DependencyInjection.instance.cliController;
   }
 
+  /// Initialize version file if it doesn't exist
+  void _initializeVersionFile() {
+    try {
+      // Only initialize if the file doesn't exist
+      if (VersionChecker.getInstalledVersionFromFile() == null) {
+        final currentVersion = VersionChecker.getCurrentVersion();
+        if (currentVersion != '1.0.0') {
+          VersionChecker.saveInstalledVersion(currentVersion);
+        }
+      }
+    } catch (e) {
+      // Silently fail - not critical
+    }
+  }
+
   Future<void> run(List<String> arguments) async {
     try {
       _argResults = _argParser.parse(arguments);
+
+      // Initialize version file if it doesn't exist (first run)
+      _initializeVersionFile();
 
       if (_argResults['help']) {
         _printUsage();
@@ -265,6 +283,18 @@ class FlutterForgeCLI {
       ]);
       
       if (result.exitCode == 0) {
+        // Get the new version and save it
+        final newVersion = await VersionChecker.getLatestCLIVersionAny();
+        if (newVersion != null) {
+          VersionChecker.saveInstalledVersion(newVersion);
+        } else {
+          // Fallback: get from current version after update
+          final currentVersion = VersionChecker.getCurrentVersion();
+          if (currentVersion != '1.0.0') {
+            VersionChecker.saveInstalledVersion(currentVersion);
+          }
+        }
+        
         await _showCompletionCelebration();
         print('');
         print('${brightGreen}${bold}✅ FlutterForge CLI updated successfully!${reset}');
