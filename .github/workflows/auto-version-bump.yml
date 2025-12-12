@@ -24,7 +24,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
-          ref: ${{ github.event.pull_request.head.ref }}
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
           persist-credentials: true
 
@@ -347,10 +347,22 @@ jobs:
         run: |
           BRANCH_NAME="${{ github.event.pull_request.head.ref }}"
           
-          # Verify we're on the correct branch
+          # Check if we're in detached HEAD state (which happens when checking out by SHA)
           CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-          echo "Current branch: $CURRENT_BRANCH"
+          echo "Current branch/HEAD: $CURRENT_BRANCH"
           echo "Target branch: $BRANCH_NAME"
+          
+          # If we're in detached HEAD, we need to stash changes, checkout branch, then apply stash
+          if [ "$CURRENT_BRANCH" = "HEAD" ]; then
+            echo "⚠️ In detached HEAD state, stashing changes and checking out branch: $BRANCH_NAME"
+            # Stash any uncommitted changes (our version updates)
+            git stash push -m "version-bump-changes" pubspec.yaml CHANGELOG.md || true
+            # Fetch and checkout the branch
+            git fetch origin "$BRANCH_NAME" --quiet || true
+            git checkout "$BRANCH_NAME" || git checkout -b "$BRANCH_NAME" "origin/$BRANCH_NAME"
+            # Apply the stashed changes
+            git stash pop || true
+          fi
           
           # Fetch latest changes from remote to avoid conflicts
           git fetch origin "$BRANCH_NAME" --quiet || true
