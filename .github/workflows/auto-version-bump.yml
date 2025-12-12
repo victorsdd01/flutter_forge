@@ -34,23 +34,23 @@ jobs:
           # Fetch main branch to compare commits
           git fetch origin main --quiet || true
           
-          BASE_SHA="${{ github.event.pull_request.base.sha }}"
           HEAD_SHA="${{ github.event.pull_request.head.sha }}"
           
-          echo "Base SHA (main): $BASE_SHA"
           echo "Head SHA (PR): $HEAD_SHA"
+          echo "Event type: ${{ github.event.action }}"
           
-          # Check if there's already a "chore: bump version" commit in this PR
-          BUMP_COMMIT_EXISTS=$(git log --oneline "$BASE_SHA..$HEAD_SHA" | grep -i "chore: bump version" || echo "")
+          # Check if the HEAD commit itself is a "chore: bump version [skip ci]" commit
+          # This means the workflow already ran and created the bump commit
+          HEAD_COMMIT_MSG=$(git log -1 --format="%s" "$HEAD_SHA" || echo "")
+          echo "HEAD commit message: $HEAD_COMMIT_MSG"
           
-          if [ -n "$BUMP_COMMIT_EXISTS" ]; then
-            echo "✅ Version bump commit already exists in this PR, skipping..."
-            echo "Bump commit found: $BUMP_COMMIT_EXISTS"
+          if echo "$HEAD_COMMIT_MSG" | grep -qi "chore: bump version.*\[skip ci\]"; then
+            echo "✅ HEAD commit is a version bump commit with [skip ci], skipping..."
             echo "already_done=true" >> $GITHUB_OUTPUT
           else
-            echo "No version bump commit found in this PR, proceeding with bump"
-            echo "Commits in PR:"
-            git log --oneline "$BASE_SHA..$HEAD_SHA" | head -5
+            echo "HEAD commit is not a version bump commit, proceeding with bump"
+            echo "Recent commits:"
+            git log --oneline -5 "$HEAD_SHA"
             echo "already_done=false" >> $GITHUB_OUTPUT
           fi
           
