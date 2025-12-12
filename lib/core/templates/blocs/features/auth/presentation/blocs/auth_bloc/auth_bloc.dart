@@ -17,7 +17,7 @@ class AuthBloc extends HydratedBloc<AuthEvent, AuthState> {
   }) : _authUseCases = authUseCases,
        super(const AuthState()) {
     on<AuthEvent>((AuthEvent event, Emitter<AuthState> emit) async {
-      event.map(
+      await event.map(
         login: (_Login e) async {
           emit(state.copyWith(isLoading: true, failure: null));
           final Either<Failure, UserEntity> result = await _authUseCases.login(e.email, e.password);
@@ -72,31 +72,32 @@ class AuthBloc extends HydratedBloc<AuthEvent, AuthState> {
         checkAuth: (_CheckAuth e) async {
           emit(state.copyWith(isLoading: true, failure: null));
           final Either<Failure, bool> result = await _authUseCases.isAuthenticated();
-          result.fold(
-            (Failure failure) => emit(
+          if (result.isLeft()) {
+            final Failure failure = result.fold((Failure l) => l, (bool r) => throw Exception());
+            emit(
               state.copyWith(failure: failure, isLoading: false, isAuthenticated: false),
-            ),
-            (bool isAuth) async {
-              if (isAuth) {
-                final Either<Failure, UserEntity?> userResult = await _authUseCases.getCurrentUser();
-                userResult.fold(
-                  (Failure failure) => emit(
-                    state.copyWith(failure: failure, isLoading: false, isAuthenticated: false),
+            );
+          } else {
+            final bool isAuth = result.fold((Failure l) => throw Exception(), (bool r) => r);
+            if (isAuth) {
+              final Either<Failure, UserEntity?> userResult = await _authUseCases.getCurrentUser();
+              userResult.fold(
+                (Failure failure) => emit(
+                  state.copyWith(failure: failure, isLoading: false, isAuthenticated: false),
+                ),
+                (UserEntity? user) => emit(
+                  state.copyWith(
+                    user: user,
+                    isLoading: false,
+                    failure: null,
+                    isAuthenticated: user != null,
                   ),
-                  (UserEntity? user) => emit(
-                    state.copyWith(
-                      user: user,
-                      isLoading: false,
-                      failure: null,
-                      isAuthenticated: user != null,
-                    ),
-                  ),
-                );
-              } else {
-                emit(state.copyWith(isLoading: false, isAuthenticated: false));
-              }
-            },
-          );
+                ),
+              );
+            } else {
+              emit(state.copyWith(isLoading: false, isAuthenticated: false));
+            }
+          }
         },
       );
     });
