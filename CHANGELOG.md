@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.10.8] - 2025-12-12
+
+### Changes
+- fix: use dart pub global list to get installed version
+
 ## [1.10.7] - 2025-12-12
 
 ### Changes
