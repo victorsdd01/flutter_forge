@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.10.5] - 2025-12-12
+
+### Changes
+- refactor: update BLoC states to use individual status flags per opera…
+
 ## [1.10.4] - 2025-12-12
 
 ### Changes

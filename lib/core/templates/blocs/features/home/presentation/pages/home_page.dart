@@ -25,16 +25,16 @@ class HomeView extends StatelessWidget {
       ),
       body: BlocBuilder<HomeBloc, HomeState>(
         builder: (BuildContext context, HomeState state) {
-          if (state.isLoading) {
+          if (state.status.isGetItems) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          if (state.failure != null) {
+          if (state.errorStatus.getItems) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: <Widget>[
-                  Text('Error: ${state.failure!.message}'),
+                  Text(state.failure != null ? 'Error: ${state.failure!.message}' : 'Error loading items'),
                   ElevatedButton(
                     onPressed: () {
                       context.read<HomeBloc>().add(const HomeEvent.initialized());

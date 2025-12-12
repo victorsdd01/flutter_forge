@@ -19,16 +19,27 @@ class AuthBloc extends HydratedBloc<AuthEvent, AuthState> {
     on<AuthEvent>((AuthEvent event, Emitter<AuthState> emit) async {
       await event.map(
         login: (_Login e) async {
-          emit(state.copyWith(isLoading: true, failure: null));
+          emit(state.copyWith(
+            status: state.status.copyWith(isLogin: true),
+            successStatus: state.successStatus.copyWith(login: false),
+            errorStatus: state.errorStatus.copyWith(login: false),
+            failure: null,
+          ));
           final Either<Failure, UserEntity> result = await _authUseCases.login(e.email, e.password);
           result.fold(
             (Failure failure) => emit(
-              state.copyWith(failure: failure, isLoading: false, isAuthenticated: false),
+              state.copyWith(
+                status: state.status.copyWith(isLogin: false),
+                errorStatus: state.errorStatus.copyWith(login: true),
+                failure: failure,
+                isAuthenticated: false,
+              ),
             ),
             (UserEntity user) => emit(
               state.copyWith(
                 user: user,
-                isLoading: false,
+                status: state.status.copyWith(isLogin: false),
+                successStatus: state.successStatus.copyWith(login: true),
                 failure: null,
                 isAuthenticated: true,
               ),
@@ -36,16 +47,27 @@ class AuthBloc extends HydratedBloc<AuthEvent, AuthState> {
           );
         },
         register: (_Register e) async {
-          emit(state.copyWith(isLoading: true, failure: null));
+          emit(state.copyWith(
+            status: state.status.copyWith(isRegister: true),
+            successStatus: state.successStatus.copyWith(register: false),
+            errorStatus: state.errorStatus.copyWith(register: false),
+            failure: null,
+          ));
           final Either<Failure, UserEntity> result = await _authUseCases.register(e.email, e.password, e.name);
           result.fold(
             (Failure failure) => emit(
-              state.copyWith(failure: failure, isLoading: false, isAuthenticated: false),
+              state.copyWith(
+                status: state.status.copyWith(isRegister: false),
+                errorStatus: state.errorStatus.copyWith(register: true),
+                failure: failure,
+                isAuthenticated: false,
+              ),
             ),
             (UserEntity user) => emit(
               state.copyWith(
                 user: user,
-                isLoading: false,
+                status: state.status.copyWith(isRegister: false),
+                successStatus: state.successStatus.copyWith(register: true),
                 failure: null,
                 isAuthenticated: true,
               ),
@@ -53,16 +75,26 @@ class AuthBloc extends HydratedBloc<AuthEvent, AuthState> {
           );
         },
         logout: (_Logout e) async {
-          emit(state.copyWith(isLoading: true, failure: null));
+          emit(state.copyWith(
+            status: state.status.copyWith(isLogout: true),
+            successStatus: state.successStatus.copyWith(logout: false),
+            errorStatus: state.errorStatus.copyWith(logout: false),
+            failure: null,
+          ));
           final Either<Failure, void> result = await _authUseCases.logout();
           result.fold(
             (Failure failure) => emit(
-              state.copyWith(failure: failure, isLoading: false),
+              state.copyWith(
+                status: state.status.copyWith(isLogout: false),
+                errorStatus: state.errorStatus.copyWith(logout: true),
+                failure: failure,
+              ),
             ),
             (void _) => emit(
               state.copyWith(
                 user: null,
-                isLoading: false,
+                status: state.status.copyWith(isLogout: false),
+                successStatus: state.successStatus.copyWith(logout: true),
                 failure: null,
                 isAuthenticated: false,
               ),
@@ -70,12 +102,22 @@ class AuthBloc extends HydratedBloc<AuthEvent, AuthState> {
           );
         },
         checkAuth: (_CheckAuth e) async {
-          emit(state.copyWith(isLoading: true, failure: null));
+          emit(state.copyWith(
+            status: state.status.copyWith(isCheckAuth: true),
+            successStatus: state.successStatus.copyWith(checkAuth: false),
+            errorStatus: state.errorStatus.copyWith(checkAuth: false),
+            failure: null,
+          ));
           final Either<Failure, bool> result = await _authUseCases.isAuthenticated();
           if (result.isLeft()) {
             final Failure failure = result.fold((Failure l) => l, (bool r) => throw Exception());
             emit(
-              state.copyWith(failure: failure, isLoading: false, isAuthenticated: false),
+              state.copyWith(
+                status: state.status.copyWith(isCheckAuth: false),
+                errorStatus: state.errorStatus.copyWith(checkAuth: true),
+                failure: failure,
+                isAuthenticated: false,
+              ),
             );
           } else {
             final bool isAuth = result.fold((Failure l) => throw Exception(), (bool r) => r);
@@ -83,19 +125,29 @@ class AuthBloc extends HydratedBloc<AuthEvent, AuthState> {
               final Either<Failure, UserEntity?> userResult = await _authUseCases.getCurrentUser();
               userResult.fold(
                 (Failure failure) => emit(
-                  state.copyWith(failure: failure, isLoading: false, isAuthenticated: false),
+                  state.copyWith(
+                    status: state.status.copyWith(isCheckAuth: false),
+                    errorStatus: state.errorStatus.copyWith(checkAuth: true),
+                    failure: failure,
+                    isAuthenticated: false,
+                  ),
                 ),
                 (UserEntity? user) => emit(
                   state.copyWith(
                     user: user,
-                    isLoading: false,
+                    status: state.status.copyWith(isCheckAuth: false),
+                    successStatus: state.successStatus.copyWith(checkAuth: true),
                     failure: null,
                     isAuthenticated: user != null,
                   ),
                 ),
               );
             } else {
-              emit(state.copyWith(isLoading: false, isAuthenticated: false));
+              emit(state.copyWith(
+                status: state.status.copyWith(isCheckAuth: false),
+                failure: null,
+                isAuthenticated: false,
+              ));
             }
           }
         },
