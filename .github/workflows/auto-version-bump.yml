@@ -24,7 +24,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
           persist-credentials: true
 
@@ -345,7 +345,6 @@ jobs:
       - name: Commit and push version bump to PR branch
         if: steps.check_version_bump.outputs.already_done == 'false'
         run: |
-          # We're already on the PR branch from the initial checkout
           BRANCH_NAME="${{ github.event.pull_request.head.ref }}"
           
           # Verify we're on the correct branch
