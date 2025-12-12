@@ -20,9 +20,35 @@ class VersionChecker {
 
   static const String _githubApiUrl = 'https://api.github.com/repos/victorsdd01/flutter_forge/releases/latest';
   
-  /// Get current version from pubspec.yaml
+  /// Get current version from pubspec.yaml or from installed package
   static String getCurrentVersion() {
     try {
+      // First, try to get version from dart pub global list (most reliable for installed packages)
+      try {
+        final result = Process.runSync(
+          'dart',
+          ['pub', 'global', 'list'],
+          runInShell: true,
+        );
+        if (result.exitCode == 0) {
+          final output = result.stdout.toString();
+          // Look for flutterforge in the output
+          final lines = output.split('\n');
+          for (final line in lines) {
+            if (line.contains('flutterforge')) {
+              // Format is usually: "flutterforge 1.10.6 from git ..."
+              final versionMatch = RegExp(r'flutterforge\s+(\d+\.\d+\.\d+)').firstMatch(line);
+              if (versionMatch != null) {
+                return versionMatch.group(1)!;
+              }
+            }
+          }
+        }
+      } catch (e) {
+        // Continue to fallback methods
+      }
+      
+      // Fallback: try to find pubspec.yaml
       final pubspecPath = _findPubspecPath();
       if (pubspecPath != null) {
         final file = File(pubspecPath);
@@ -35,8 +61,7 @@ class VersionChecker {
         }
       }
       
-      // If not found locally, try to get from Git repository (for globally installed packages)
-      // This is a fallback that works when installed via `dart pub global activate --source git`
+      // Last resort: try to get from Git repository
       try {
         final gitVersion = getLatestCLIVersionFromGitSync();
         if (gitVersion != null) {
