@@ -82,8 +82,10 @@ class VersionChecker {
               final versionMatch = RegExp(r'flutterforge\s+(\d+\.\d+\.\d+)').firstMatch(line);
               if (versionMatch != null) {
                 final version = versionMatch.group(1)!;
-                // Save it for future use
-                saveInstalledVersion(version);
+                // Only save if version file doesn't exist (don't overwrite existing)
+                if (getInstalledVersionFromFile() == null) {
+                  saveInstalledVersion(version);
+                }
                 return version;
               }
             }
@@ -102,8 +104,10 @@ class VersionChecker {
           final versionMatch = RegExp(r'version:\s*(\d+\.\d+\.\d+)').firstMatch(content);
           if (versionMatch != null) {
             final version = versionMatch.group(1)!;
-            // Save it for future use
-            saveInstalledVersion(version);
+            // Only save if version file doesn't exist (don't overwrite existing)
+            if (getInstalledVersionFromFile() == null) {
+              saveInstalledVersion(version);
+            }
             return version;
           }
         }
