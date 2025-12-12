@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changes
 - feat: implement CocoaPods setup for iOS/macOS in FlutterCommandDataSo…
 
+## [1.10.4] - 2025-12-12
+
+### Changes
+- feat: implement CocoaPods setup for iOS/macOS in FlutterCommandDataSo…
+
 ## [1.10.3] - 2025-12-07
 
 ### Changes
