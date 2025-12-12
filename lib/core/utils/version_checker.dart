@@ -20,10 +20,52 @@ class VersionChecker {
 
   static const String _githubApiUrl = 'https://api.github.com/repos/victorsdd01/flutter_forge/releases/latest';
   
+  /// Get the path to the version file
+  static String _getVersionFilePath() {
+    final homeDir = Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'] ?? '';
+    if (homeDir.isNotEmpty) {
+      return path.join(homeDir, '.flutterforge_version');
+    }
+    // Fallback to current directory
+    return path.join(Directory.current.path, '.flutterforge_version');
+  }
+  
+  /// Save the installed version to a file
+  static void saveInstalledVersion(String version) {
+    try {
+      final versionFile = File(_getVersionFilePath());
+      versionFile.writeAsStringSync(version);
+    } catch (e) {
+      // Silently fail - not critical
+    }
+  }
+  
+  /// Get the installed version from the version file
+  static String? getInstalledVersionFromFile() {
+    try {
+      final versionFile = File(_getVersionFilePath());
+      if (versionFile.existsSync()) {
+        final version = versionFile.readAsStringSync().trim();
+        if (version.isNotEmpty && RegExp(r'^\d+\.\d+\.\d+$').hasMatch(version)) {
+          return version;
+        }
+      }
+    } catch (e) {
+      // Silently fail
+    }
+    return null;
+  }
+  
   /// Get current version from pubspec.yaml or from installed package
   static String getCurrentVersion() {
+    // First, try to get version from the saved version file (most reliable)
+    final savedVersion = getInstalledVersionFromFile();
+    if (savedVersion != null) {
+      return savedVersion;
+    }
+    
     try {
-      // First, try to get version from dart pub global list (most reliable for installed packages)
+      // Second, try to get version from dart pub global list
       try {
         final result = Process.runSync(
           'dart',
@@ -39,7 +81,10 @@ class VersionChecker {
               // Format is usually: "flutterforge 1.10.6 from git ..."
               final versionMatch = RegExp(r'flutterforge\s+(\d+\.\d+\.\d+)').firstMatch(line);
               if (versionMatch != null) {
-                return versionMatch.group(1)!;
+                final version = versionMatch.group(1)!;
+                // Save it for future use
+                saveInstalledVersion(version);
+                return version;
               }
             }
           }
@@ -56,7 +101,10 @@ class VersionChecker {
           final content = file.readAsStringSync();
           final versionMatch = RegExp(r'version:\s*(\d+\.\d+\.\d+)').firstMatch(content);
           if (versionMatch != null) {
-            return versionMatch.group(1)!;
+            final version = versionMatch.group(1)!;
+            // Save it for future use
+            saveInstalledVersion(version);
+            return version;
           }
         }
       }
@@ -65,6 +113,7 @@ class VersionChecker {
       try {
         final gitVersion = getLatestCLIVersionFromGitSync();
         if (gitVersion != null) {
+          // Don't save Git version as installed version, it's just a fallback
           return gitVersion;
         }
       } catch (e) {
