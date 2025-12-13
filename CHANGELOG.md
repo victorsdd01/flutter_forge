@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.10.12] - 2025-12-13
+
+### Changes
+- feat: add push to main trigger for version bump workflow (temporary)
+
 ## [1.10.11] - 2025-12-12
 
 ### Changes
