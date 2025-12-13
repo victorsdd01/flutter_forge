@@ -4,6 +4,8 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     branches: [main]
+  push:
+    branches: [main]
 
 permissions:
   contents: write
@@ -12,9 +14,11 @@ permissions:
 jobs:
   bump-version:
     if: |
-      !contains(github.event.pull_request.title, '[skip ci]') &&
-      !contains(github.event.pull_request.title, 'chore: bump version') &&
-      github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name
+      (github.event_name == 'push' || (
+        !contains(github.event.pull_request.title, '[skip ci]') &&
+        !contains(github.event.pull_request.title, 'chore: bump version') &&
+        github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name
+      ))
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -24,7 +28,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           persist-credentials: true
 
@@ -34,7 +38,7 @@ jobs:
           # Fetch main branch to compare commits
           git fetch origin main --quiet || true
           
-          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha || github.sha }}"
           
           echo "Head SHA (PR): $HEAD_SHA"
           echo "Event type: ${{ github.event.action }}"
@@ -90,8 +94,15 @@ jobs:
           set -e
           
           # Get PR title and body, handling special characters safely
-          PR_TITLE="${{ github.event.pull_request.title }}"
-          PR_BODY="${{ github.event.pull_request.body }}"
+          # For push events, use commit message
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            PR_TITLE="${{ github.event.pull_request.title }}"
+            PR_BODY="${{ github.event.pull_request.body }}"
+          else
+            # For push events, use commit message
+            PR_TITLE=$(git log -1 --pretty=%s "${{ github.sha }}")
+            PR_BODY=$(git log -1 --pretty=%b "${{ github.sha }}")
+          fi
           
           # Sanitize variables - remove carriage returns
           PR_TITLE=$(echo "${PR_TITLE}" | tr -d '\r' || echo "")
@@ -327,7 +338,7 @@ jobs:
       - name: Commit and push version bump to PR branch
         if: steps.check_version_bump.outputs.already_done == 'false'
         run: |
-          BRANCH_NAME="${{ github.event.pull_request.head.ref }}"
+          BRANCH_NAME="${{ github.event.pull_request.head.ref || github.ref_name }}"
           
           # Check if version files have changed
           if git diff --quiet pubspec.yaml CHANGELOG.md; then
